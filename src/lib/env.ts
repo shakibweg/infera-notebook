@@ -29,11 +29,13 @@ export const PINECONE_INDEX = process.env.PINECONE_INDEX || '';
 export const AWS_REGION = process.env.AWS_REGION || '';
 export const AWS_ACCESS_KEY_ID = process.env.AWS_ACCESS_KEY_ID || '';
 export const AWS_SECRET_ACCESS_KEY = process.env.AWS_SECRET_ACCESS_KEY || '';
-export const AWS_ENDPOINT = process.env.AWS_ENDPOINT || '';
+export const AWS_ENDPOINT_URL_S3 =
+  process.env.AWS_ENDPOINT_URL_S3 || process.env.AWS_ENDPOINT || '';
+export const AWS_ENDPOINT = AWS_ENDPOINT_URL_S3;
 export const AWS_S3_BUCKET_NAME = process.env.AWS_S3_BUCKET_NAME || '';
 export const AWS_FORCE_PATH_STYLE =
   process.env.AWS_FORCE_PATH_STYLE === 'true' ||
-  (process.env.AWS_FORCE_PATH_STYLE !== 'false' && Boolean(AWS_ENDPOINT));
+  (process.env.AWS_FORCE_PATH_STYLE !== 'false' && Boolean(AWS_ENDPOINT_URL_S3));
 
 // --- CLOUDFLARE AI GATEWAY ---
 // Removed gateway configuration

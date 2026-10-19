@@ -17,7 +17,7 @@ export function getS3Client(): S3Client {
   if (!s3Client) {
     const region = env.AWS_REGION!;
     const bucket = env.AWS_S3_BUCKET_NAME!;
-    const endpoint = env.AWS_ENDPOINT;
+    const endpoint = env.AWS_ENDPOINT_URL_S3;
 
     if (!region || !bucket) {
       throw new Error(
@@ -44,7 +44,7 @@ export function getS3Client(): S3Client {
 export function _getInternalUrl(path: string): string {
   const region = env.AWS_REGION!;
   const bucket = env.AWS_S3_BUCKET_NAME!;
-  const endpoint = env.AWS_ENDPOINT;
+  const endpoint = env.AWS_ENDPOINT_URL_S3;
 
   const baseUrl = endpoint
     ? `${endpoint.replace(/\/$/, '')}/${bucket}`

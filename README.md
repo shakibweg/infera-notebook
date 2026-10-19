@@ -94,7 +94,7 @@ PINECONE_INDEX=infera-notebook
 
 # --- MEDIA STORAGE (AWS S3 / CLOUDFLARE R2) ---
 AWS_REGION=auto
-AWS_ENDPOINT=https://your_account_id.r2.cloudflarestorage.com
+AWS_ENDPOINT_URL_S3=https://your_account_id.r2.cloudflarestorage.com
 AWS_ACCESS_KEY_ID=your_r2_access_key_id
 AWS_SECRET_ACCESS_KEY=your_r2_secret_access_key
 AWS_S3_BUCKET_NAME=infera-notebook
