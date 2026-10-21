@@ -130,10 +130,53 @@ export async function getSignedDownloadUrl(path: string, expiresIn = 3600): Prom
  * Deletes an object from the bucket.
  */
 export async function deleteFile(path: string): Promise<void> {
-  const command = new DeleteObjectCommand({
-    Bucket: env.AWS_S3_BUCKET_NAME!,
-    Key: path,
-  });
+  if (!path || typeof path !== 'string' || path.startsWith('http://') || path.startsWith('https://')) {
+    return;
+  }
 
-  await getS3Client().send(command);
+  try {
+    const command = new DeleteObjectCommand({
+      Bucket: env.AWS_S3_BUCKET_NAME!,
+      Key: path,
+    });
+
+    await getS3Client().send(command);
+  } catch (error) {
+    console.error(`[S3_DELETE_FILE_ERROR] Failed to delete file at path "${path}":`, error);
+  }
+}
+
+/**
+ * Deletes all S3 storage objects associated with a source (raw file + extracted-text cache).
+ */
+export async function deleteSourceStorage(
+  sourceId: string,
+  filePath?: string | null
+): Promise<void> {
+  const promises: Promise<void>[] = [
+    deleteFile(`extracted-text/${sourceId}.txt`),
+  ];
+  if (filePath) {
+    promises.push(deleteFile(filePath));
+  }
+  await Promise.allSettled(promises);
+}
+
+/**
+ * Retrieves the raw text content of an object from S3.
+ * Returns null if the object does not exist or fails to load.
+ */
+export async function getObjectText(path: string): Promise<string | null> {
+  try {
+    const command = new GetObjectCommand({
+      Bucket: env.AWS_S3_BUCKET_NAME!,
+      Key: path,
+    });
+
+    const response = await getS3Client().send(command);
+    if (!response.Body) return null;
+    return await response.Body.transformToString();
+  } catch (error) {
+    return null;
+  }
 }

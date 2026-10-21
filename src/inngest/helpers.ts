@@ -1,7 +1,7 @@
 import { VectorStoreError } from './errors';
 import { initializeVectorStore } from '@/lib/pinecone';
 export { initializeVectorStore };
-import { getSignedDownloadUrl } from '@/lib/s3';
+import { getSignedDownloadUrl, getObjectText, uploadBuffer } from '@/lib/s3';
 
 import { AllowedSourceType, Status } from '@/generated/prisma/enums';
 import { allowedSourceTypes } from '@/lib/constants';
@@ -126,14 +126,16 @@ export async function saveToVectorStore(
 /**
  * Updates the source processing status in the PostgreSQL database.
  */
-export async function updateSourceTable(sourceId: string, status: Status, sourceTitle?: string) {
+export async function updateSourceTable(sourceId: string, status: Status, sourceTitle?: string): Promise<boolean> {
   try {
     await prisma.source.update({
       where: { id: sourceId },
       data: { status, sourceTitle },
     });
+    return true;
   } catch (error) {
-    throw new Error(`Failed to update source table status: ${error}`);
+    console.error(`[UPDATE_SOURCE_TABLE] Failed to update source table status: ${error}`);
+    return false;
   }
 }
 
@@ -157,25 +159,48 @@ export async function getDocumentFromSources(step: InngestStep, sourceIds: strin
       });
     });
 
-    if (!sources) {
+    if (!sources || sources.length === 0) {
       throw new RetryAfterError('Failed to get sources', 10000);
     }
 
-    const vectors = await step.run('get-vectors', async () => {
+    const documentTexts = await step.run('get-document-texts', async () => {
       return await Promise.all(
         sources.map(async (source: any) => {
+          // Check cached extracted text first (avoids re-scraping websites, re-parsing PDFs, or re-fetching YouTube)
+          try {
+            const cached = await getObjectText(`extracted-text/${source.id}.txt`);
+            if (cached && cached.trim().length > 0) {
+              return cached;
+            }
+          } catch (e) {
+            // cache miss or s3 read error, proceed to fallback extraction
+          }
+
+          // Fallback: extract vectors if not cached yet
           const vectors = await processSourceToVectors({
             url: source.file.path,
             type: source.type,
           });
-          // Return only the pageContent to keep the step output size small
-          return vectors.map((v) => v.pageContent);
+          const text = vectors.map((v) => v.pageContent).join('\n\n');
+
+          // Best-effort cache write for subsequent notes
+          try {
+            await uploadBuffer(
+              Buffer.from(text, 'utf-8'),
+              `extracted-text/${source.id}.txt`,
+              'text/plain'
+            );
+          } catch (e) {
+            // ignore cache write error
+          }
+
+          return text;
         })
       );
     });
+
     const fullText = await step.run('vectors-to-document', async () => {
-      const flattenedVectors = vectors.flat();
-      return flattenedVectors.join('\n\n');
+      return documentTexts.join('\n\n');
     });
 
     return fullText;

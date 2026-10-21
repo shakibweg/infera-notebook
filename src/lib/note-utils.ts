@@ -41,3 +41,50 @@ export async function resolveNoteAssets(note: any): Promise<any> {
     return note;
   }
 }
+
+/**
+ * Traverses note content and deletes any associated assets (audio, images, slides) from S3.
+ */
+export async function deleteNoteAssets(
+  type: AllowedNoteType,
+  content: string | object | null | undefined
+): Promise<void> {
+  if (!content) return;
+
+  try {
+    let parsed: any;
+    if (typeof content === 'string') {
+      try {
+        parsed = JSON.parse(content);
+      } catch {
+        return;
+      }
+    } else {
+      parsed = content;
+    }
+
+    if (!parsed) return;
+
+    const paths: string[] = [];
+
+    if (type === AllowedNoteType.INFOGRAPHIC && parsed.path) {
+      paths.push(parsed.path);
+    } else if (type === AllowedNoteType.SLIDE_DECK && Array.isArray(parsed)) {
+      parsed.forEach((s: any) => s?.path && paths.push(s.path));
+    } else if (type === AllowedNoteType.AUDIO_OVERVIEW && parsed.path) {
+      paths.push(parsed.path);
+    } else if (type === AllowedNoteType.VIDEO_OVERVIEW) {
+      if (parsed.path) paths.push(parsed.path);
+      if (Array.isArray(parsed.images)) {
+        parsed.images.forEach((img: any) => img?.path && paths.push(img.path));
+      }
+    }
+
+    if (paths.length > 0) {
+      await Promise.allSettled(paths.map((p) => deleteFile(p)));
+    }
+  } catch (e) {
+    console.error('[DELETE_NOTE_ASSETS_ERROR]', e);
+  }
+}
+
