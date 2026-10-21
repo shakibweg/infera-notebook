@@ -145,7 +145,10 @@ model Notebook {
 
   sources Source[]
   notes Note[]
+  chats Chat[]
   messages Message[]
+
+  @@index([userId])
 }
 
 
@@ -163,6 +166,8 @@ model Source {
   file File @relation(fields: [fileId], references: [id], onDelete: Cascade)
 
   notes Note[]
+
+  @@index([notebookId])
 }
 
 
@@ -189,6 +194,22 @@ model Note {
   updatedAt DateTime @updatedAt
 
   sources Source[]
+
+  @@index([notebookId])
+}
+
+
+model Chat {
+  id String @id @default(uuid())
+  notebookId String
+  notebook Notebook @relation(fields: [notebookId], references: [id], onDelete: Cascade)
+  title String @default("New Chat")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  messages Message[]
+
+  @@index([notebookId])
 }
 
 
@@ -196,8 +217,13 @@ model Message {
   id String @id @default(uuid())
   notebookId String 
   notebook Notebook @relation(fields: [notebookId], references: [id], onDelete: Cascade)
+  chatId String?
+  chat Chat? @relation(fields: [chatId], references: [id], onDelete: Cascade)
   role MessageRole @default(user)
   parts Json[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([notebookId])
+  @@index([chatId])
 }
