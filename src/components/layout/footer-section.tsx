@@ -240,7 +240,11 @@ export function FooterSection() {
               <SelectTrigger className="h-9 min-w-32 bg-background/50 text-foreground border-border">
                 <SelectValue placeholder="Language" />
               </SelectTrigger>
-              <SelectContent position="popper" align="end" className="bg-popover text-popover-foreground border-border">
+              <SelectContent
+                position="popper"
+                align="end"
+                className="bg-popover text-popover-foreground border-border"
+              >
                 <SelectItem value="en">English</SelectItem>
                 <SelectItem value="es">Español</SelectItem>
                 <SelectItem value="fr">Français</SelectItem>

@@ -87,4 +87,3 @@ export async function deleteNoteAssets(
     console.error('[DELETE_NOTE_ASSETS_ERROR]', e);
   }
 }
-

@@ -164,20 +164,20 @@ sequenceDiagram
 
 ### Supported Vectorizer Loaders
 
-| Source Category | Parser Implementation | Details |
-|---|---|---|
-| PDF | `pdf-parse` / LangChain PDFLoader | Extracts text and handles multi-column layouts |
-| Word (.docx) | `mammoth` / `word-extractor` | Preserves headers and body text |
-| PowerPoint (.pptx) | `officeparser` | Extracts slide text and presenter notes |
-| EPUB | `epub2` | Parses chapters and narrative |
-| Text (.txt) | LangChain TextLoader | UTF-8 stream processing |
-| Data (CSV, JSON, JSONL) | LangChain DataLoaders | Structured data extraction |
-| Subtitles (.srt) | `srt-parser-2` | Normalizes timestamps and dialogue blocks |
-| Audio | Deepgram Nova-3 / AssemblyAI | Speech-to-text and speaker diarization |
-| Video | Audio extraction + Deepgram | Transcribes audio tracks |
-| Websites | `@mendable/firecrawl-js` | Extracts Markdown and removes boilerplate |
-| YouTube | `youtubei.js` + Apify fallback | Captures subtitles or transcribes audio |
-| GitHub repositories | LangChain GithubLoader | Ingests source code and Markdown documentation |
+| Source Category         | Parser Implementation             | Details                                        |
+| ----------------------- | --------------------------------- | ---------------------------------------------- |
+| PDF                     | `pdf-parse` / LangChain PDFLoader | Extracts text and handles multi-column layouts |
+| Word (.docx)            | `mammoth` / `word-extractor`      | Preserves headers and body text                |
+| PowerPoint (.pptx)      | `officeparser`                    | Extracts slide text and presenter notes        |
+| EPUB                    | `epub2`                           | Parses chapters and narrative                  |
+| Text (.txt)             | LangChain TextLoader              | UTF-8 stream processing                        |
+| Data (CSV, JSON, JSONL) | LangChain DataLoaders             | Structured data extraction                     |
+| Subtitles (.srt)        | `srt-parser-2`                    | Normalizes timestamps and dialogue blocks      |
+| Audio                   | Deepgram Nova-3 / AssemblyAI      | Speech-to-text and speaker diarization         |
+| Video                   | Audio extraction + Deepgram       | Transcribes audio tracks                       |
+| Websites                | `@mendable/firecrawl-js`          | Extracts Markdown and removes boilerplate      |
+| YouTube                 | `youtubei.js` + Apify fallback    | Captures subtitles or transcribes audio        |
+| GitHub repositories     | LangChain GithubLoader            | Ingests source code and Markdown documentation |
 
 ---
 
@@ -250,20 +250,20 @@ flowchart LR
 
 ### Note Type Implementations
 
-| Note Type | Handler or Implementation | Generation Output |
-|---|---|---|
-| `EDITABLE_NOTE` | User-created or converted | BlockNote block JSON |
-| `CHAT_NOTE` | `/api/chat` save action | Markdown conversation record |
-| `AUDIO_OVERVIEW` | `src/lib/notes/audio-overview` | Dialogue script and generated audio |
+| Note Type        | Handler or Implementation      | Generation Output                                 |
+| ---------------- | ------------------------------ | ------------------------------------------------- |
+| `EDITABLE_NOTE`  | User-created or converted      | BlockNote block JSON                              |
+| `CHAT_NOTE`      | `/api/chat` save action        | Markdown conversation record                      |
+| `AUDIO_OVERVIEW` | `src/lib/notes/audio-overview` | Dialogue script and generated audio               |
 | `VIDEO_OVERVIEW` | `src/lib/notes/video-overview` | Synchronized slides, audio, and Remotion metadata |
-| `MIND_MAP` | `src/lib/notes/mindmap` | XYFlow graph specification |
-| `FAQ` | `src/lib/notes/faq` | Questions, answers, and categories |
-| `TIMELINE` | `src/lib/notes/timeline` | Dates, titles, and descriptions |
-| `BRIEFING_DOC` | `src/lib/notes/briefing` | Executive summary, findings, and recommendations |
-| `SLIDE_DECK` | `src/lib/notes/slide-deck` | Slides, bullets, and speaker notes |
-| `INFOGRAPHIC` | `src/lib/notes/infographic` | Data sections, metrics, and visual hierarchy |
-| `QUIZ` | `src/lib/notes/quiz` | Questions, options, answers, and explanations |
-| `FLASH_CARDS` | `src/lib/notes/flash-cards` | Front, back, and category fields |
+| `MIND_MAP`       | `src/lib/notes/mindmap`        | XYFlow graph specification                        |
+| `FAQ`            | `src/lib/notes/faq`            | Questions, answers, and categories                |
+| `TIMELINE`       | `src/lib/notes/timeline`       | Dates, titles, and descriptions                   |
+| `BRIEFING_DOC`   | `src/lib/notes/briefing`       | Executive summary, findings, and recommendations  |
+| `SLIDE_DECK`     | `src/lib/notes/slide-deck`     | Slides, bullets, and speaker notes                |
+| `INFOGRAPHIC`    | `src/lib/notes/infographic`    | Data sections, metrics, and visual hierarchy      |
+| `QUIZ`           | `src/lib/notes/quiz`           | Questions, options, answers, and explanations     |
+| `FLASH_CARDS`    | `src/lib/notes/flash-cards`    | Front, back, and category fields                  |
 
 ---
 
@@ -360,4 +360,3 @@ sequenceDiagram
 - **IDOR protection:** API routes verify notebook and source ownership before reading or modifying records.
 - **Quota and credit protection:** Daily-resetting credits help control API usage.
 - **Input validation:** Zod schemas validate endpoint payloads before execution.
-

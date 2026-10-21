@@ -126,7 +126,11 @@ export async function saveToVectorStore(
 /**
  * Updates the source processing status in the PostgreSQL database.
  */
-export async function updateSourceTable(sourceId: string, status: Status, sourceTitle?: string): Promise<boolean> {
+export async function updateSourceTable(
+  sourceId: string,
+  status: Status,
+  sourceTitle?: string
+): Promise<boolean> {
   try {
     await prisma.source.update({
       where: { id: sourceId },

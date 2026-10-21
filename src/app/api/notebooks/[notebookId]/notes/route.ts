@@ -315,12 +315,14 @@ export async function DELETE(
     await deleteNoteAssets(note.type, note.content);
 
     // Fire Inngest cancel event with only noteId
-    await inngest.send({
-      name: 'note/deleted',
-      data: {
-        noteId,
-      },
-    }).catch((e) => console.error('[DELETE_NOTE] Inngest cancel event failed:', e));
+    await inngest
+      .send({
+        name: 'note/deleted',
+        data: {
+          noteId,
+        },
+      })
+      .catch((e) => console.error('[DELETE_NOTE] Inngest cancel event failed:', e));
 
     return NextResponse.json({ success: true });
   } catch (error) {

@@ -130,7 +130,12 @@ export async function getSignedDownloadUrl(path: string, expiresIn = 3600): Prom
  * Deletes an object from the bucket.
  */
 export async function deleteFile(path: string): Promise<void> {
-  if (!path || typeof path !== 'string' || path.startsWith('http://') || path.startsWith('https://')) {
+  if (
+    !path ||
+    typeof path !== 'string' ||
+    path.startsWith('http://') ||
+    path.startsWith('https://')
+  ) {
     return;
   }
 
@@ -153,9 +158,7 @@ export async function deleteSourceStorage(
   sourceId: string,
   filePath?: string | null
 ): Promise<void> {
-  const promises: Promise<void>[] = [
-    deleteFile(`extracted-text/${sourceId}.txt`),
-  ];
+  const promises: Promise<void>[] = [deleteFile(`extracted-text/${sourceId}.txt`)];
   if (filePath) {
     promises.push(deleteFile(filePath));
   }

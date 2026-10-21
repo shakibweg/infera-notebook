@@ -176,24 +176,28 @@ export async function DELETE(
 
     // 2. Delete associated File record from Database
     if (fileId) {
-      await prisma.file.delete({
-        where: { id: fileId },
-      }).catch((fileErr) => {
-        console.warn('[DELETE_SOURCE] File record cleanup warning:', fileErr);
-      });
+      await prisma.file
+        .delete({
+          where: { id: fileId },
+        })
+        .catch((fileErr) => {
+          console.warn('[DELETE_SOURCE] File record cleanup warning:', fileErr);
+        });
     }
 
     // 3. Offload external cleanup (Pinecone vectors, S3 storage, cancellation) to Inngest
-    await inngest.send({
-      name: 'source/deleted',
-      data: {
-        sourceId,
-        filePath,
-        fileId,
-      },
-    }).catch((inngestErr) => {
-      console.error('[DELETE_SOURCE] Failed to dispatch Inngest cleanup event:', inngestErr);
-    });
+    await inngest
+      .send({
+        name: 'source/deleted',
+        data: {
+          sourceId,
+          filePath,
+          fileId,
+        },
+      })
+      .catch((inngestErr) => {
+        console.error('[DELETE_SOURCE] Failed to dispatch Inngest cleanup event:', inngestErr);
+      });
 
     return NextResponse.json({ success: true });
   } catch (error) {

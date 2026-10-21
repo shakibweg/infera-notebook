@@ -162,7 +162,9 @@ export async function DELETE(
           fileIds,
         },
       })
-      .catch((e) => console.error('[DELETE_NOTEBOOK] Failed to dispatch Inngest cleanup event:', e));
+      .catch((e) =>
+        console.error('[DELETE_NOTEBOOK] Failed to dispatch Inngest cleanup event:', e)
+      );
 
     return NextResponse.json({ success: true });
   } catch (error) {

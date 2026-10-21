@@ -305,7 +305,8 @@ export const deleteSource = inngest.createFunction(
   {
     id: 'delete-source',
     name: 'Delete Source Cleanup',
-    description: 'Cleans up Pinecone vectors, S3 files, and database records when a source is deleted',
+    description:
+      'Cleans up Pinecone vectors, S3 files, and database records when a source is deleted',
     retries: 2,
   },
   { event: 'source/deleted' },
@@ -367,12 +368,18 @@ export const deleteNotebook = inngest.createFunction(
   {
     id: 'delete-notebook',
     name: 'Delete Notebook Cleanup',
-    description: 'Cleans up all vectors, storage assets, and in-flight jobs when a notebook is deleted',
+    description:
+      'Cleans up all vectors, storage assets, and in-flight jobs when a notebook is deleted',
     retries: 2,
   },
   { event: 'notebook/deleted' },
   async ({ event, step }) => {
-    const { notebookId, sources = [], notes = [], fileIds = [] } = event.data as {
+    const {
+      notebookId,
+      sources = [],
+      notes = [],
+      fileIds = [],
+    } = event.data as {
       notebookId: string;
       sources?: Array<{ id: string; filePath?: string | null }>;
       notes?: Array<{ id: string; type: AllowedNoteType; content: string | null }>;
@@ -416,18 +423,14 @@ export const deleteNotebook = inngest.createFunction(
     // 3. Delete S3 storage for all sources (raw files + extracted-text cache)
     if (sources.length > 0) {
       await step.run('delete-sources-storage', async () => {
-        await Promise.allSettled(
-          sources.map((s) => deleteSourceStorage(s.id, s.filePath))
-        );
+        await Promise.allSettled(sources.map((s) => deleteSourceStorage(s.id, s.filePath)));
       });
     }
 
     // 4. Delete S3 storage for all notes (audio overview, video overview, infographics, slides)
     if (notes.length > 0) {
       await step.run('delete-notes-storage', async () => {
-        await Promise.allSettled(
-          notes.map((n) => deleteNoteAssets(n.type, n.content))
-        );
+        await Promise.allSettled(notes.map((n) => deleteNoteAssets(n.type, n.content)));
       });
     }
 
@@ -447,4 +450,3 @@ export const deleteNotebook = inngest.createFunction(
     return { success: true, notebookId };
   }
 );
-
