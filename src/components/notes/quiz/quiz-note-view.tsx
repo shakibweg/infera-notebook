@@ -5,7 +5,7 @@
  */
 
 import React, { useState } from 'react';
-import type { SelectedNote } from '@/hooks/useSelectedNote';
+import type { SelectedNote } from '@/hooks/use-selected-note';
 import { cn } from '@/lib/utils';
 import { useTheme } from 'next-themes';
 import { motion, AnimatePresence } from 'motion/react';
@@ -21,6 +21,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useChatStore } from '@/hooks/use-chat-store';
 
 type QuizOption = {
   option: string;
@@ -117,7 +118,7 @@ I chose this as the answer: '${userOption}'
 That answer was ${isActuallyCorrect ? 'correct' : 'incorrect'}. The correct answer is '${correctOption}'
 Help me understand why my answer was ${isActuallyCorrect ? 'correct' : 'incorrect'}.`;
 
-    window.dispatchEvent(new CustomEvent('chat:send', { detail: { message } }));
+    useChatStore.getState().setPendingMessage(message);
   };
 
   const prevQuestion = () => {

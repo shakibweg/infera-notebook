@@ -7,10 +7,10 @@
 'use client';
 
 import RemotionPlayer from './remotion-player';
-import { useSignedUrls } from '@/hooks/useSignedUrls';
+import { useSignedUrls } from '@/hooks/use-signed-urls';
 import { Loader2 } from 'lucide-react';
 import { useMemo } from 'react';
-import type { SelectedNote } from '@/hooks/useSelectedNote';
+import type { SelectedNote } from '@/hooks/use-selected-note';
 
 type Props = {
   note: SelectedNote; // The note object containing URLs and script data

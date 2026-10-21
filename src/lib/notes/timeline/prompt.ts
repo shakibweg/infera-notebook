@@ -8,18 +8,17 @@ Build a clear, insightful TIMELINE of the events, phases, milestones, or logical
 </task>
 
 <instructions>
-1. Identify all chronological events, phases, or key milestones in the document.
-2. For each entry, provide a precise time reference and a rich description of what happened and why it matters.
-3. If the document lacks explicit dates, infer logical ordering and use descriptive time labels (e.g., "Phase 1", "Early Development", "Following the merger").
-4. Include cause-and-effect relationships where relevant.
-5. Aim for 6–15 entries that capture the full narrative arc.
+1. Title: Create a topic-specific title (strictly 3 to 6 words) in Title Case (e.g. "Evolution of Large Language Models", never generic "Timeline").
+2. Identify 6–15 chronological milestones, execution phases, or sequential developments from the document.
+3. Chronological Order: Strictly sort events in chronological sequence from earliest to latest.
+4. Time Labels: Provide concise, consistent time references (e.g., exact dates like "October 2023", years like "2024", or sequential stages like "Phase 1: Architecture Design" if dates are absent).
+5. Impact Analysis: For each event, describe what occurred and its direct causal consequence or significance (1–3 sentences).
 </instructions>
 
 <constraints>
-- Time labels must be consistent in format throughout the timeline.
-- Each description should be 1–3 sentences, information-dense, and specific.
-- Preserve the original document's terminology and key details.
-- Do NOT invent events or dates not supported by the document.
+- Maintain strict forward chronological ordering.
+- Descriptions must be specific, information-dense, and retain exact names, metrics, and technical terms.
+- Do NOT invent dates, milestones, or events not supported by the document.
 </constraints>
 
 <context>
@@ -30,7 +29,10 @@ ${document}
 export const OUTPUT_SCHEMA = {
   type: 'object' as const,
   properties: {
-    title: { type: 'string', description: 'A concise title for the timeline' },
+    title: {
+      type: 'string',
+      description: 'A crisp title (strictly 3 to 6 words, Title Case, substantive topic)',
+    },
     content: {
       type: 'array',
       description: 'Array of 6–15 chronological events',

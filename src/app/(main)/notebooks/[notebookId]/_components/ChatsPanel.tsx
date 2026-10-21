@@ -11,11 +11,22 @@ import {
   Search,
   Save,
   Loader2,
+  ChevronDown,
+  Plus,
+  Trash2,
+  X,
 } from 'lucide-react';
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { toast } from 'sonner';
-import { useNotebookStore } from '@/hooks/useNotebookStore';
-import { useChatStore } from '@/hooks/useChatStore';
+import { useNotebookStore } from '@/hooks/use-notebook-store';
+import { useChatStore } from '@/hooks/use-chat-store';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu';
 import {
   Conversation,
   ConversationContent,
@@ -35,7 +46,6 @@ import { Reasoning, ReasoningTrigger, ReasoningContent } from '@/components/ai-e
 import { Source } from '@/components/ai-elements/sources';
 import { TextShimmer } from '@/components/ui/text-shimmer';
 import { cn } from '@/lib/utils';
-import { generateNoteTitleFromMessage } from '@/actions/generate-title';
 import { AllowedNoteType, Status } from '@/generated/prisma/enums';
 
 interface ChatsPanelProps {
@@ -142,7 +152,16 @@ const ChatSkeleton = () => (
  * - Persistent chat history.
  */
 export function ChatsPanel({ className = '', notebookId }: ChatsPanelProps) {
-  const { selectedSourceIds, sources, fetchCredits, credits, currentNotebook } = useNotebookStore();
+  const {
+    selectedSourceIds,
+    sources,
+    fetchCredits,
+    credits,
+    currentNotebook,
+    addNote: addStoreNote,
+    updateNote: updateStoreNote,
+    removeNote: removeStoreNote,
+  } = useNotebookStore();
   const {
     messages,
     status,
@@ -152,10 +171,21 @@ export function ChatsPanel({ className = '', notebookId }: ChatsPanelProps) {
     setInputValue,
     isLoadingHistory,
     fetchMessages,
+    chats,
+    activeChatId,
+    fetchChats,
+    startNewChat,
+    createNewChat,
+    deleteChat,
+    selectChat,
+    pendingMessage,
+    setPendingMessage,
   } = useChatStore();
 
   const [savingNoteId, setSavingNoteId] = useState<string | null>(null);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
+  const [confirmDeleteChatId, setConfirmDeleteChatId] = useState<string | null>(null);
+  const [isDeletingChatId, setIsDeletingChatId] = useState<string | null>(null);
   const listEndRef = useRef<HTMLDivElement>(null);
 
   // Get selected source objects
@@ -164,12 +194,18 @@ export function ChatsPanel({ className = '', notebookId }: ChatsPanelProps) {
   // Get notebookId from prop or currentNotebook
   const activeNotebookId = notebookId || currentNotebook?.id;
 
-  // Fetch messages from API on mount
+  // Fetch chats and active messages on mount
   useEffect(() => {
     if (activeNotebookId) {
-      fetchMessages(activeNotebookId);
+      fetchChats(activeNotebookId);
     }
-  }, [activeNotebookId, fetchMessages]);
+  }, [activeNotebookId, fetchChats]);
+
+  // Active chat metadata
+  const activeChat = chats.find((c) => c.id === activeChatId);
+  const activeChatDisplayTitle = activeChatId
+    ? activeChat?.title?.trim() || 'Untitled chat'
+    : 'New chat';
 
   const handleSendMessage = useCallback(
     (message: string) => {
@@ -202,18 +238,13 @@ export function ChatsPanel({ className = '', notebookId }: ChatsPanelProps) {
     [selectedSourceIds, sources, sendMessage, activeNotebookId]
   );
 
-  // Listen for external chat:send events (e.g. from Quiz)
+  // Listen for external message requests (e.g. from Quiz or other note components)
   useEffect(() => {
-    const handleForceSend = (e: any) => {
-      const message = e.detail?.message;
-      if (message) {
-        handleSendMessage(message);
-      }
-    };
-
-    window.addEventListener('chat:send', handleForceSend);
-    return () => window.removeEventListener('chat:send', handleForceSend);
-  }, [handleSendMessage]);
+    if (pendingMessage) {
+      handleSendMessage(pendingMessage);
+      setPendingMessage(null);
+    }
+  }, [pendingMessage, handleSendMessage, setPendingMessage]);
 
   const handleCopy = useCallback(async (text: string, messageId: string) => {
     try {
@@ -228,7 +259,7 @@ export function ChatsPanel({ className = '', notebookId }: ChatsPanelProps) {
 
   /**
    * Saves the content of an AI message as a new note in the current notebook.
-   * Uses optimistic UI updates via custom events to show the note instantly in the NotesPanel.
+   * Directly updates the global Zustand store for reactive UI updates across panels.
    *
    * @param messageContent - The markdown/text content to save
    */
@@ -243,19 +274,16 @@ export function ChatsPanel({ className = '', notebookId }: ChatsPanelProps) {
       const placeholderTitle = 'Saving note...';
       setSavingNoteId(noteId);
 
-      // Optimistically add note to UI
-      window.dispatchEvent(
-        new CustomEvent('note:created', {
-          detail: {
-            id: noteId,
-            noteTitle: placeholderTitle,
-            type: AllowedNoteType.CHAT_NOTE,
-            status: Status.PROCESSING,
-            createdAt: new Date(),
-            content: '',
-          },
-        })
-      );
+      // Optimistically add note to Zustand store
+      const optimisticNote = {
+        id: noteId,
+        noteTitle: placeholderTitle,
+        type: AllowedNoteType.CHAT_NOTE,
+        status: Status.PROCESSING,
+        createdAt: new Date(),
+        content: '',
+      };
+      addStoreNote(optimisticNote);
 
       try {
         // Create note
@@ -281,35 +309,36 @@ export function ChatsPanel({ className = '', notebookId }: ChatsPanelProps) {
         // Refresh credits after successful note creation
         fetchCredits();
 
-        // Update note via custom event
-        window.dispatchEvent(
-          new CustomEvent('note:updated', {
-            detail: {
-              id: noteId,
-              noteTitle: createdNote.noteTitle ?? placeholderTitle,
-              status: createdNote.status as Status,
-              createdAt: new Date(createdNote.createdAt || createdNote.updatedAt),
-              content: createdNote.content ?? messageContent,
-            },
-          })
-        );
+        const updatedData = {
+          id: noteId,
+          noteTitle: createdNote.noteTitle ?? placeholderTitle,
+          status: createdNote.status as Status,
+          createdAt: new Date(createdNote.createdAt || createdNote.updatedAt),
+          content: createdNote.content ?? messageContent,
+        };
 
+        // Update note in Zustand store
+        updateStoreNote(noteId, updatedData);
         toast.success('Note saved successfully');
       } catch (error) {
         console.error('[ChatsPanel] Failed to save note:', error);
         toast.error('Failed to save note');
 
-        // Remove failed note via custom event
-        window.dispatchEvent(
-          new CustomEvent('note:failed', {
-            detail: { id: noteId },
-          })
-        );
+        // Remove failed note from store
+        removeStoreNote(noteId);
       } finally {
         setSavingNoteId(null);
       }
     },
-    [activeNotebookId, selectedSourceIds, credits, fetchCredits]
+    [
+      activeNotebookId,
+      selectedSourceIds,
+      credits,
+      fetchCredits,
+      addStoreNote,
+      updateStoreNote,
+      removeStoreNote,
+    ]
   );
 
   // Disable chat input if no sources are selected
@@ -323,8 +352,155 @@ export function ChatsPanel({ className = '', notebookId }: ChatsPanelProps) {
         className
       )}
     >
-      <div className="mb-4 flex items-center justify-between shrink-0">
-        <p className="text-sm font-bold text-foreground">Chats</p>
+      <div className="mb-4 flex items-center justify-between gap-2 shrink-0">
+        {/* Unboxed, borderless chat title selector (No heavy container/box) */}
+        <DropdownMenu
+          onOpenChange={(open) => {
+            if (!open) {
+              setConfirmDeleteChatId(null);
+            }
+          }}
+        >
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              className="group flex items-center gap-1.5 text-sm font-bold text-foreground hover:text-primary transition-colors cursor-pointer outline-none select-none max-w-[220px] sm:max-w-[320px] text-left"
+              title={`Active chat: ${activeChatDisplayTitle}`}
+            >
+              <span className="truncate">{activeChatDisplayTitle}</span>
+              <ChevronDown className="size-3.5 text-muted-foreground/70 group-hover:text-primary transition-colors shrink-0" />
+            </button>
+          </DropdownMenuTrigger>
+
+          <DropdownMenuContent
+            align="start"
+            className="w-[300px] p-1.5 rounded-xl border border-border bg-popover shadow-xl z-50"
+          >
+            {/* Start new chat inside dropdown */}
+            <DropdownMenuItem
+              onClick={() => {
+                startNewChat();
+              }}
+              className="flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs font-medium text-primary hover:bg-primary/10 cursor-pointer focus:bg-primary/10 focus:text-primary transition-colors"
+            >
+              <Plus className="size-4 shrink-0" />
+              <span>Start new chat</span>
+            </DropdownMenuItem>
+
+            {chats.length > 0 && <DropdownMenuSeparator className="my-1 bg-border/60" />}
+
+            {chats.length > 0 && (
+              <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/80">
+                Chats ({chats.length})
+              </div>
+            )}
+
+            {/* Scrollable chat list with selection and delete actions */}
+            <div className="max-h-[240px] overflow-y-auto space-y-0.5 pr-0.5">
+              {chats.map((chat, idx) => {
+                const isActive = chat.id === activeChatId;
+                const titleText = chat.title?.trim() || 'Untitled chat';
+                return (
+                  <div
+                    key={chat.id}
+                    onClick={() => {
+                      if (confirmDeleteChatId === chat.id) return;
+                      if (activeNotebookId) {
+                        selectChat(activeNotebookId, chat.id);
+                      }
+                    }}
+                    className={cn(
+                      'group flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg text-xs transition-colors cursor-pointer select-none',
+                      isActive
+                        ? 'bg-accent text-accent-foreground font-medium'
+                        : 'text-foreground hover:bg-accent/60'
+                    )}
+                  >
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      {isActive ? (
+                        <Check className="size-3.5 text-primary shrink-0" />
+                      ) : (
+                        <MessageSquare className="size-3.5 text-muted-foreground/60 shrink-0" />
+                      )}
+                      <span className="truncate">{titleText}</span>
+                    </div>
+
+                    {/* Delete chat action: if confirmation active, show Confirm (Yes) & Cancel buttons */}
+                    {confirmDeleteChatId === chat.id ? (
+                      <div
+                        className="flex items-center gap-1 shrink-0 animate-in fade-in duration-150"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <button
+                          type="button"
+                          title="Confirm delete"
+                          disabled={isDeletingChatId === chat.id}
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            if (activeNotebookId) {
+                              try {
+                                setIsDeletingChatId(chat.id);
+                                await deleteChat(activeNotebookId, chat.id);
+                              } finally {
+                                setIsDeletingChatId(null);
+                                setConfirmDeleteChatId(null);
+                              }
+                            }
+                          }}
+                          className="size-6 flex items-center justify-center rounded-md bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-all cursor-pointer shadow-xs disabled:opacity-50"
+                        >
+                          {isDeletingChatId === chat.id ? (
+                            <Loader2 className="size-3 animate-spin" />
+                          ) : (
+                            <Check className="size-3.5" />
+                          )}
+                        </button>
+                        <button
+                          type="button"
+                          title="Cancel"
+                          disabled={isDeletingChatId === chat.id}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setConfirmDeleteChatId(null);
+                          }}
+                          className="size-6 flex items-center justify-center rounded-md bg-muted/80 hover:bg-muted text-muted-foreground hover:text-foreground transition-all cursor-pointer"
+                        >
+                          <X className="size-3.5" />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        title="Delete chat"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setConfirmDeleteChatId(chat.id);
+                        }}
+                        className="opacity-0 group-hover:opacity-100 sm:opacity-0 focus:opacity-100 size-6 flex items-center justify-center rounded-md hover:bg-destructive/15 hover:text-destructive text-muted-foreground transition-all shrink-0 cursor-pointer"
+                      >
+                        <Trash2 className="size-3.5" />
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        {/* Icon-only button for new chat */}
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          title="New chat"
+          onClick={() => {
+            startNewChat();
+          }}
+          className="size-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors cursor-pointer shrink-0"
+        >
+          <Plus className="size-4" />
+        </Button>
       </div>
 
       <div className="flex flex-1 min-h-0 flex-col">
@@ -408,7 +584,8 @@ export function ChatsPanel({ className = '', notebookId }: ChatsPanelProps) {
                           {(() => {
                             // Check if this is a streaming assistant message with no text yet
                             const textParts = parts.filter(
-                              (part: any) => part.type === 'text' && part.text?.trim()
+                              (part: any) =>
+                                part.type === 'text' && (part.text?.trim() || part.content?.trim())
                             );
                             const hasTextParts = textParts.length > 0;
                             const isStreamingAssistant =
@@ -434,6 +611,27 @@ export function ChatsPanel({ className = '', notebookId }: ChatsPanelProps) {
                               return false;
                             });
 
+                            const hasReasoningParts = parts.some(
+                              (part: any) =>
+                                part.type === 'reasoning' &&
+                                (part.reasoning?.trim() || part.text?.trim())
+                            );
+
+                            if (
+                              isStreamingAssistant &&
+                              !hasTextParts &&
+                              !hasActiveToolCalls &&
+                              !hasReasoningParts
+                            ) {
+                              return (
+                                <div className="flex items-center gap-1.5 py-1 text-muted-foreground/70">
+                                  <span className="size-2 rounded-full bg-primary/60 animate-pulse" />
+                                  <span className="size-2 rounded-full bg-primary/60 animate-pulse [animation-delay:200ms]" />
+                                  <span className="size-2 rounded-full bg-primary/60 animate-pulse [animation-delay:400ms]" />
+                                </div>
+                              );
+                            }
+
                             return null;
                           })()}
                           {parts
@@ -444,7 +642,7 @@ export function ChatsPanel({ className = '', notebookId }: ChatsPanelProps) {
                               const key = `${message.id}-${i}`;
 
                               if (part.type === 'text') {
-                                const text = part.text ?? '';
+                                const text = part.text ?? part.content ?? '';
                                 if (!text) return null;
 
                                 return (
@@ -462,7 +660,8 @@ export function ChatsPanel({ className = '', notebookId }: ChatsPanelProps) {
                               }
 
                               if (part.type === 'reasoning') {
-                                const reasoningText = part.reasoning ?? part.text ?? '';
+                                const reasoningText =
+                                  part.reasoning ?? part.text ?? part.content ?? '';
                                 const isStreaming = Boolean(part.isStreaming);
                                 if (!reasoningText) return null;
 
@@ -954,16 +1153,17 @@ export function ChatsPanel({ className = '', notebookId }: ChatsPanelProps) {
                                 {(() => {
                                   const textPart = Array.isArray(message.parts)
                                     ? (message.parts as any[]).find(
-                                        (p) => p.type === 'text' && p.text
+                                        (p) => p.type === 'text' && (p.text || p.content)
                                       )
                                     : null;
-                                  if (!textPart?.text) return null;
+                                  const textToCopy = textPart?.text ?? textPart?.content ?? '';
+                                  if (!textToCopy) return null;
 
                                   return (
                                     <>
                                       <MessageAction
                                         label={copiedMessageId === message.id ? 'Copied' : 'Copy'}
-                                        onClick={() => handleCopy(textPart.text, message.id)}
+                                        onClick={() => handleCopy(textToCopy, message.id)}
                                         tooltip={
                                           copiedMessageId === message.id
                                             ? 'Copied!'
@@ -978,7 +1178,7 @@ export function ChatsPanel({ className = '', notebookId }: ChatsPanelProps) {
                                       </MessageAction>
                                       <MessageAction
                                         label="Save as Note"
-                                        onClick={() => handleSaveAsNote(textPart.text)}
+                                        onClick={() => handleSaveAsNote(textToCopy)}
                                         tooltip="Save this message as a note"
                                         disabled={savingNoteId !== null}
                                       >
@@ -1000,14 +1200,17 @@ export function ChatsPanel({ className = '', notebookId }: ChatsPanelProps) {
                           <MessageActions className="mt-1 flex justify-end">
                             {(() => {
                               const textPart = Array.isArray(message.parts)
-                                ? (message.parts as any[]).find((p) => p.type === 'text' && p.text)
+                                ? (message.parts as any[]).find(
+                                    (p) => p.type === 'text' && (p.text || p.content)
+                                  )
                                 : null;
-                              if (!textPart?.text) return null;
+                              const textToCopy = textPart?.text ?? textPart?.content ?? '';
+                              if (!textToCopy) return null;
 
                               return (
                                 <MessageAction
                                   label={copiedMessageId === message.id ? 'Copied' : 'Copy'}
-                                  onClick={() => handleCopy(textPart.text, message.id)}
+                                  onClick={() => handleCopy(textToCopy, message.id)}
                                   tooltip={
                                     copiedMessageId === message.id ? 'Copied!' : 'Copy your message'
                                   }

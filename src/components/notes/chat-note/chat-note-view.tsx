@@ -7,7 +7,7 @@
 'use client';
 
 import React from 'react';
-import type { SelectedNote } from '@/hooks/useSelectedNote';
+import type { SelectedNote } from '@/hooks/use-selected-note';
 import { MessageResponse } from '@/components/ai-elements/message';
 
 type Props = {

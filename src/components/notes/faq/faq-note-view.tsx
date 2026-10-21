@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import type { SelectedNote } from '@/hooks/useSelectedNote';
+import type { SelectedNote } from '@/hooks/use-selected-note';
 import { FAQ_NOTE_TYPE } from '@/types/notes';
 import {
   Accordion,

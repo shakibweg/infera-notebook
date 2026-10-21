@@ -12,24 +12,24 @@ You are a world-class presentation designer and educator who creates compelling,
 
 <instructions>
 1. Structure the deck with a clear narrative arc:
-   - Slide 1: Title/Introduction — hook the audience
-   - Slides 2–N-1: Core content — one key idea per slide
-   - Final slide: Summary/Conclusion — key takeaway
-2. Each slide title should be concise (3–8 words) and capture the slide's main idea.
+   - Slide 1: Title/Introduction — hook the audience with the core problem or opportunity
+   - Slides 2–N-1: Core content — one key conceptual milestone per slide
+   - Final slide: Conclusion & Takeaways — forward-looking synthesis
+2. Each slide title should be concise (3–7 words), punchy, and in Title Case.
 3. Each image prompt should describe:
-   - Subject matter and composition
-   - Visual style (photorealistic, illustration, diagram, etc.)
-   - Color palette and mood
-   - Any text overlays, labels, or annotations to include
-4. Vary visual styles across slides to maintain audience engagement.
+   - Visual subject matter, central metaphor, and scene composition
+   - Visual artistic style (e.g., minimalist 3D isometric render, cinematic photography, architectural diagram, editorial illustration)
+   - Color palette, lighting, atmosphere, and mood
+   - Perspective (e.g., wide establishing shot, macro close-up, top-down view)
+4. Maintain visual consistency and a cohesive artistic style across all slides in the deck.
 </instructions>
 
 <constraints>
 - Each slide must convey exactly ONE key idea or concept.
-- Image prompts must be specific and detailed (50–150 words each).
-- Slides must flow logically — each should build on the previous.
-- Avoid generic stock-photo descriptions. Be creative and topic-specific.
-- Do NOT include more than 8 slides.
+- Image prompts must be specific and detailed (50–120 words each).
+- CRITICAL: Do NOT request paragraphs of text, captions, or typography inside the image prompt. Image models render text poorly; focus purely on rich visual metaphors, objects, lighting, and composition.
+- Slides must flow logically — each building upon the previous.
+- Keep the deck strictly between 5 and 8 slides.
 </constraints>
 
 <context>

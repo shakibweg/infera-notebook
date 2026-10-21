@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import type { SelectedNote } from '@/hooks/useSelectedNote';
+import type { SelectedNote } from '@/hooks/use-selected-note';
 import MindmapCanvas, { MindmapNode } from '@/components/mindmap/mindmap-canvas';
 
 type MindmapPayload = {

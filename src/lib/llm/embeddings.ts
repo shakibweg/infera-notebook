@@ -6,94 +6,131 @@ import {
 } from '@/lib/constants';
 import { GoogleGenAI } from '@google/genai';
 import { GEMINI_API_KEY } from './config';
+import {
+  EMBEDDING_ROUTER_MODELS,
+  orderChainByHealth,
+  recordModelSuccess,
+  recordModelFailure,
+  isAbortError,
+  isAuthError,
+  isRetryableModelError,
+} from './model-router';
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
- * Executes an embedding call with automatic retry and backoff on rate limit (429) errors.
+ * Executes an embedding call with dynamic model router fallback.
+ * Automatically tries healthy models first. If a model encounters a rate limit (429),
+ * quota limit, or server error (503/500), it benches the model on in-memory cooldown
+ * and immediately falls over to the next candidate model in the chain.
  */
-async function embedWithRetry(
+async function embedWithRouter(
   google: GoogleGenAI,
   content: string,
-  retries = 4
+  modelChain: readonly string[] = EMBEDDING_ROUTER_MODELS,
+  chainRetries = 2
 ): Promise<number[]> {
-  for (let attempt = 0; attempt <= retries; attempt++) {
-    try {
-      const response = await google.models.embedContent({
-        model: EMBEDDING_MODEL_ID,
-        contents: content,
-        config: { outputDimensionality: GEMINI_EMBEDDING_DIMENSIONALITY },
-      });
+  const modelErrors: Record<string, string> = {};
 
-      const values = response.embeddings?.[0]?.values;
-      if (!values) {
-        throw new Error('No embedding returned from Gemini API');
-      }
+  for (let attempt = 0; attempt <= chainRetries; attempt++) {
+    // Health-aware ordering: puts healthy models first to avoid 429 latency pauses
+    const modelsToTry = orderChainByHealth(modelChain);
 
-      return values;
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      const isRateLimit =
-        errorMessage.includes('429') ||
-        errorMessage.includes('RESOURCE_EXHAUSTED') ||
-        errorMessage.includes('Quota exceeded');
+    for (const model of modelsToTry) {
+      try {
+        const response = await google.models.embedContent({
+          model,
+          contents: content,
+          config: { outputDimensionality: GEMINI_EMBEDDING_DIMENSIONALITY },
+        });
 
-      if (isRateLimit && attempt < retries) {
-        // Parse retry delay if provided by Google (e.g., "Please retry in 25.79s")
-        const match = errorMessage.match(/retry in ([0-9.]+)s/i);
-        const retryDelaySec = match ? parseFloat(match[1]) : 0;
-        const waitMs =
-          retryDelaySec > 0
-            ? Math.ceil(retryDelaySec * 1000) + 1000
-            : Math.min(2000 * Math.pow(2, attempt), 30000) + Math.floor(Math.random() * 1000);
+        const values = response.embeddings?.[0]?.values;
+        if (!values || values.length === 0) {
+          throw new Error(`Model "${model}" returned empty embedding vector.`);
+        }
+
+        recordModelSuccess(model);
+        return values;
+      } catch (error: unknown) {
+        if (isAbortError(error)) {
+          throw error;
+        }
+
+        // Fatal authentication error: halt immediately without useless retries
+        if (isAuthError(error)) {
+          console.error(
+            `[Embedding Router] Fatal authentication error with model "${model}":`,
+            error
+          );
+          throw error;
+        }
+
+        const msg = error instanceof Error ? error.message : String(error);
+
+        if (isRetryableModelError(error)) {
+          recordModelFailure(model, error);
+        }
 
         console.warn(
-          `[Gemini Embeddings] Rate limit encountered. Retrying in ${waitMs}ms (attempt ${attempt + 1}/${retries})...`
+          `[Embedding Router] Model "${model}" failed (${msg}). Routing to fallback embedding model...`
         );
-        await sleep(waitMs);
-        continue;
+        modelErrors[model] = msg;
       }
+    }
 
-      throw error;
+    if (attempt < chainRetries) {
+      const waitMs =
+        Math.min(2000 * Math.pow(2, attempt), 10000) + Math.floor(Math.random() * 1000);
+      console.warn(
+        `[Embedding Router] All candidate models temporarily busy or exhausted. Retrying router chain in ${waitMs}ms (attempt ${attempt + 1}/${chainRetries})...`
+      );
+      await sleep(waitMs);
     }
   }
 
-  throw new Error('Failed to embed content after maximum retries');
+  console.error('[Embedding Router] All fallback models failed for embeddings:', modelErrors);
+  throw new Error(`All embedding models failed: ${JSON.stringify(modelErrors)}`);
 }
 
 /**
  * Gemini Embedding - Query (Asymmetric)
- * Uses the 'search_query' task type instruction as recommended for Gemini 2.
+ * Uses the 'search_query' task type instruction as recommended for Gemini embeddings.
+ * Dynamically cascades through EMBEDDING_ROUTER_MODELS if the primary model fails.
  */
-export async function embedQuery(text: string): Promise<number[]> {
+export async function embedQuery(text: string, models?: readonly string[]): Promise<number[]> {
   const google = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
   const query = `task: search result | query: ${text}`;
-  return embedWithRetry(google, query);
+  return embedWithRouter(google, query, models ?? EMBEDDING_ROUTER_MODELS);
 }
 
 /**
  * Gemini Embedding - Documents (Asymmetric)
  * Uses the 'title: none | text: {content}' format for documents as recommended.
+ * Supports batching and cascades through EMBEDDING_ROUTER_MODELS if any model fails.
  */
-export async function embedDocuments(texts: string[]): Promise<number[][]> {
+export async function embedDocuments(
+  texts: string[],
+  models?: readonly string[]
+): Promise<number[][]> {
   const google = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
   const batchSize = GEMINI_EMBEDDING_BATCH_SIZE;
   const results: number[][] = [];
+  const activeChain = models ?? EMBEDDING_ROUTER_MODELS;
 
   for (let i = 0; i < texts.length; i += batchSize) {
     const batch = texts.slice(i, i + batchSize);
 
     const batchPromises = batch.map((text) => {
       const doc = `title: none | text: ${text}`;
-      return embedWithRetry(google, doc);
+      return embedWithRouter(google, doc, activeChain);
     });
 
     const batchResults = await Promise.all(batchPromises);
     results.push(...batchResults);
 
-    // If more batches remain, pause briefly to respect Gemini rate limits (100 RPM)
+    // If more batches remain, pause briefly to respect upstream quotas
     if (i + batchSize < texts.length) {
-      await sleep(1000);
+      await sleep(500);
     }
   }
 
@@ -104,6 +141,6 @@ export async function embedDocuments(texts: string[]): Promise<number[][]> {
  * Functional embeddings implementation for LangChain vector stores.
  */
 export const vectorEmbeddings: EmbeddingsInterface = {
-  embedQuery,
-  embedDocuments,
+  embedQuery: (text: string) => embedQuery(text),
+  embedDocuments: (texts: string[]) => embedDocuments(texts),
 };

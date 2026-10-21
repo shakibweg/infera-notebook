@@ -74,7 +74,8 @@ export const OUTPUT_SCHEMA = {
   properties: {
     title: {
       type: 'string',
-      description: 'A short, punchy podcast episode title (strictly 3 to 6 words)',
+      description:
+        'A punchy podcast episode title (strictly 3 to 6 words, Title Case, focusing on the substantive topic)',
     },
     participants: {
       type: 'array',
@@ -99,7 +100,7 @@ export const OUTPUT_SCHEMA = {
     },
     segments: {
       type: 'array',
-      description: 'Array of 15–30 dialogue segments',
+      description: 'Array of 20–35 dialogue segments',
       items: {
         type: 'object',
         properties: {

@@ -22,8 +22,8 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Settings, Trash2, MessageSquareX, FileX, StickyNote, AlertTriangle } from 'lucide-react';
-import { useNotebookStore } from '@/hooks/useNotebookStore';
-import { useChatStore } from '@/hooks/useChatStore';
+import { useNotebookStore } from '@/hooks/use-notebook-store';
+import { useChatStore } from '@/hooks/use-chat-store';
 import { toast } from 'sonner';
 
 interface NotebookSettingsDialogProps {
@@ -40,7 +40,7 @@ type ActionConfig = {
 const ACTIONS: ActionConfig[] = [
   { id: 'sources', label: 'Delete All Sources', icon: FileX },
   { id: 'notes', label: 'Delete All Notes', icon: StickyNote },
-  { id: 'chats', label: 'Delete All Chat Messages', icon: MessageSquareX },
+  { id: 'chats', label: 'Delete All Chats', icon: MessageSquareX },
   { id: 'notebook', label: 'Delete This Notebook', icon: Trash2, destructive: true },
 ];
 
@@ -49,7 +49,7 @@ const ACTIONS: ActionConfig[] = [
  * Provides a management interface for the notebook, allowing users to:
  * - Delete all sources.
  * - Delete all notes.
- * - Delete all chat messages.
+ * - Delete all chats.
  * - Delete the entire notebook.
  * Features confirmation dialogs for all destructive actions.
  */
@@ -83,7 +83,7 @@ export function NotebookSettingsDialog({ notebookId }: NotebookSettingsDialogPro
           body = { all: true };
           break;
         case 'chats':
-          url = `/api/notebooks/${notebookId}/messages`;
+          url = `/api/notebooks/${notebookId}/chats`;
           break;
         case 'notebook':
           url = `/api/notebooks/${notebookId}`;
@@ -108,12 +108,12 @@ export function NotebookSettingsDialog({ notebookId }: NotebookSettingsDialogPro
         router.push('/notebooks');
       } else {
         if (action === 'chats') {
-          useChatStore.getState().clearMessages();
+          await useChatStore.getState().fetchChats(notebookId);
         } else if (action === 'sources') {
           useNotebookStore.getState().setSources([]);
           useNotebookStore.getState().setSelectedSourceIds([]);
         } else if (action === 'notes') {
-          window.dispatchEvent(new CustomEvent('note:clear-all'));
+          useNotebookStore.getState().clearNotes();
         }
         router.refresh();
       }

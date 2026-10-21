@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useNotebookStore } from '@/hooks/useNotebookStore';
+import { useNotebookStore } from '@/hooks/use-notebook-store';
 import { cn } from '@/lib/utils';
 
 export function CreditBadge({ className }: { className?: string }) {

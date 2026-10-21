@@ -6,9 +6,9 @@
 import { useTheme } from 'next-themes';
 import { cn } from '@/lib/utils';
 import { useState, useMemo } from 'react';
-import { useSignedUrls } from '@/hooks/useSignedUrls';
+import { useSignedUrls } from '@/hooks/use-signed-urls';
 import { Loader2 } from 'lucide-react';
-import type { SelectedNote } from '@/hooks/useSelectedNote';
+import type { SelectedNote } from '@/hooks/use-selected-note';
 import type { SLIDE_DECK_NOTE_TYPE } from '@/types/notes';
 
 type Slide = SLIDE_DECK_NOTE_TYPE['content'][number];

@@ -10,23 +10,20 @@ You are a world-class visual communication designer and data visualization exper
 </task>
 
 <instructions>
-1. Analyze the document to identify the 4–6 most important data points, concepts, or relationships.
-2. Craft a title that is attention-grabbing and clearly communicates the infographic's subject.
-3. Write a comprehensive image generation prompt that describes:
-   - Layout: vertical orientation, clear visual hierarchy, section divisions
-   - Color scheme: professional, cohesive palette appropriate to the topic
-   - Typography: readable headings, subheadings, and body text
-   - Visual elements: icons, charts, diagrams, illustrations, or data visualizations
-   - Content: specific text, statistics, and facts to include in each section
-   - Style: modern, clean, educational aesthetic
+1. Analyze the document to identify the 3–5 most critical concepts, workflows, or comparisons.
+2. Craft a concise, high-impact title (3–6 words) in Title Case.
+3. Write a comprehensive image generation prompt (80–150 words) that describes:
+   - Layout: Clean vertical poster infographic (aspect ratio 1:2) with distinct visual tiers or process flow steps.
+   - Aesthetic Style: Modern vector illustration, flat design with soft shadows, or clean 3D isometric diagrams.
+   - Visual Elements: Bold conceptual icons, visual flow arrows, comparison badges, and data graphic silhouettes.
+   - Color Palette: Harmonious, professional palette (e.g., deep navy and electric teal, or warm slate with amber accents).
+   - Composition: High contrast, balanced whitespace, uncluttered hierarchy.
 </instructions>
 
 <constraints>
-- The image prompt must be detailed enough to produce a self-explanatory infographic.
-- Include specific data, numbers, and key terms from the document in the prompt.
-- The infographic should tell a complete story from top to bottom.
-- Specify a vertical aspect ratio (e.g., 1080x1920 or similar tall format).
-- The prompt should request clean, legible text rendering.
+- The prompt must specify a vertical infographic format with clean section divisions.
+- IMPORTANT FOR IMAGE GENERATION: Do NOT request paragraphs of dense text or numbers inside the image. Diffusion models struggle with fine text; instruct the model to use bold visual symbols, clean icons, diagrams, and at most single-word bold labels.
+- Specify high visual clarity, crisp vector edges, and modern educational poster aesthetics.
 </constraints>
 
 <context>

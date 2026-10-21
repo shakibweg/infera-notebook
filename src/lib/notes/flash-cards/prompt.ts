@@ -8,24 +8,24 @@ Design a high-quality set of FLASH CARDS optimized for long-term retention of th
 </task>
 
 <instructions>
-1. Create 10–20 flash cards covering the most important ideas, facts, and relationships in the document.
-2. Apply the "minimum information principle" — each card should test exactly ONE concept.
-3. Use a variety of card formats:
-   - Definition cards: "What is [term]?" → clear definition
-   - Concept cards: "Explain [concept]" → concise explanation
-   - Relationship cards: "How does X relate to Y?" → connection
-   - Application cards: "When would you use [concept]?" → practical use
-4. Front (question) should be specific and unambiguous.
-5. Back (answer) should be concise (1–3 sentences) but complete.
-6. Order cards from foundational concepts to advanced topics.
+1. Title: Create a topic-specific title (strictly 3 to 6 words) in Title Case (e.g. "Neural Network Backpropagation Flashcards", never generic "Flash Cards").
+2. Create 10–20 flash cards covering the most important concepts, mechanics, and relationships in the document.
+3. Apply the "minimum information principle" — each card should test exactly ONE atomic concept.
+4. Use a diverse variety of active recall prompts:
+   - Definitional: "What is [term] and what is its primary function?"
+   - Mechanism: "How does [process] occur step-by-step?"
+   - Comparative: "How does X differ fundamentally from Y?"
+   - Scenario/Application: "In what scenario would [technique] fail or degrade?"
+5. Front (prompt) must be specific, challenging, and unambiguous.
+6. Back (answer) must be crisp (1–3 sentences), highlighting key terms in bold, completely self-contained.
+7. Sequence cards progressively from foundational premises to advanced nuances.
 </instructions>
 
 <constraints>
-- Each card front must be a clear question or prompt, not a statement.
-- Each card back must be self-contained — understandable without other cards.
-- Avoid "yes/no" questions. Prefer open-ended recall questions.
-- Include specific terms, names, and figures from the document.
-- Do NOT create cards for trivial or obvious information.
+- Front must be an explicit question or prompt, never a vague statement.
+- Avoid obvious or yes/no questions. Demand active recall.
+- Ensure answers are strictly grounded in the document without hallucination.
+- No duplicate concepts across cards.
 </constraints>
 
 <context>
@@ -36,7 +36,11 @@ ${document}
 export const OUTPUT_SCHEMA = {
   type: 'object' as const,
   properties: {
-    title: { type: 'string', description: 'A concise title for the flash card set' },
+    title: {
+      type: 'string',
+      description:
+        'A crisp title (strictly 3 to 6 words, Title Case, focusing on the substantive subject)',
+    },
     content: {
       type: 'array',
       description: 'Array of 10–20 flash cards ordered from foundational to advanced',

@@ -24,7 +24,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Notebook, useNotebookStore } from '@/hooks/useNotebookStore';
+import { Notebook, useNotebookStore } from '@/hooks/use-notebook-store';
 import { UserButtonSimpleTheme } from '@/components/user/user-button-simple-theme';
 import { ModeToggle } from '@/components/theme/mode-toggle';
 import { ChatsPanel } from './_components/ChatsPanel';

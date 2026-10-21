@@ -7,12 +7,12 @@
 'use client';
 
 import React from 'react';
-import type { SelectedNote } from '@/hooks/useSelectedNote';
+import type { SelectedNote } from '@/hooks/use-selected-note';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Loader2, Mic, Users } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { useSignedUrls } from '@/hooks/useSignedUrls';
+import { useSignedUrls } from '@/hooks/use-signed-urls';
 import { AudioPlayer } from './audio-player';
 import { Transcription, TranscriptionSegment } from '@/components/ai-elements/transcription';
 

@@ -1,3 +1,45 @@
+import { AllowedNoteType, AllowedSourceType, Status } from '@/generated/prisma/enums';
+
+export interface SelectedNote {
+  id: string;
+  noteTitle: string;
+  type: AllowedNoteType;
+  status: Status;
+  createdAt: Date;
+  content?: string;
+  sources?: { id: string }[];
+}
+
+export interface Note {
+  id: string;
+  noteTitle: string;
+  type: AllowedNoteType;
+  status: Status;
+  createdAt: Date;
+  content?: string;
+  sources?: { id: string }[];
+}
+
+export interface Source {
+  id: string;
+  sourceTitle: string;
+  type: AllowedSourceType;
+  fileId: string;
+  file: {
+    path: string;
+    contentType: string;
+  };
+  status: Status;
+}
+
+export interface Notebook {
+  id: string;
+  title: string;
+  content?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 /**
  * Represents a basic text or markdown note saved from a chat conversation.
  */
@@ -174,3 +216,16 @@ export type FLASH_CARDS_NOTE_TYPE = {
   createdAt: Date;
   updatedAt: Date;
 };
+
+// Modern PascalCase Aliases
+export type ChatNote = CHAT_NOTE_TYPE;
+export type MindMapNote = MIND_MAP_NOTE_TYPE;
+export type AudioOverviewNote = AUDIO_OVERVIEW_NOTE_TYPE;
+export type VideoOverviewNote = VIDEO_OVERVIEW_NOTE_TYPE;
+export type FaqNote = FAQ_NOTE_TYPE;
+export type TimelineNote = TIMELINE_NOTE_TYPE;
+export type BriefingDocNote = BRIEFING_DOC_NOTE_TYPE;
+export type SlideDeckNote = SLIDE_DECK_NOTE_TYPE;
+export type InfographicNote = INFOGRAPHIC_NOTE_TYPE;
+export type QuizNote = QUIZ_NOTE_TYPE;
+export type FlashCardsNote = FLASH_CARDS_NOTE_TYPE;

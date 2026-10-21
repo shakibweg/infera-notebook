@@ -28,6 +28,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   AlertCircle,
+  ArrowLeft,
   FileText,
   Github,
   Globe,
@@ -41,7 +42,6 @@ import {
   Video,
   Volume2,
   X,
-  Youtube,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -53,9 +53,9 @@ import {
 } from '@/lib/constants';
 import { AllowedSourceType, Status } from '@/generated/prisma/enums';
 import { cn } from '@/lib/utils';
-import { useNotebookStore, type Source, type SourceStatus } from '@/hooks/useNotebookStore';
+import { useNotebookStore, type Source, type SourceStatus } from '@/hooks/use-notebook-store';
 import { useInngestSubscription } from '@inngest/realtime/hooks';
-import { fetchNotebookRealtimeSubscriptionToken } from '@/actions/inngest-realtime';
+import { fetchNotebookRealtimeSubscriptionToken } from '@/inngest/realtime';
 
 // Re-export Source type for local use
 type LocalSource = Source;
@@ -71,6 +71,27 @@ type IncomingSource = {
   };
   status?: SourceStatus | 'COMPLETED' | string;
 };
+
+/**
+ * Official YouTube Icon component with authentic brand styling (#FF0000 red badge with white play triangle).
+ */
+function YouTubeIcon({ className = 'size-4' }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className={className}
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
+    >
+      <path
+        d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814z"
+        fill="#FF0000"
+      />
+      <path d="M9.545 15.568V8.432L15.818 12l-6.273 3.568z" fill="#FFFFFF" />
+    </svg>
+  );
+}
 
 interface SourcePanelProps {
   className?: string;
@@ -103,6 +124,9 @@ export function SourcePanel({ className = '', notebookId }: SourcePanelProps) {
   } = useNotebookStore();
 
   const [modalOpen, setModalOpen] = useState(false);
+  const [addSourceMode, setAddSourceMode] = useState<
+    'default' | 'website' | 'youtube' | 'text' | 'discover'
+  >('default');
   const [discoverModalOpen, setDiscoverModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editTitle, setEditTitle] = useState('');
@@ -267,6 +291,7 @@ export function SourcePanel({ className = '', notebookId }: SourcePanelProps) {
     setIsLinkSubmitting(true);
     setError(null);
     setModalOpen(false); // Close dialog immediately
+    setAddSourceMode('default');
 
     try {
       const response = await fetch(`/api/notebooks/${resolvedNotebookId}/sources`, {
@@ -326,6 +351,7 @@ export function SourcePanel({ className = '', notebookId }: SourcePanelProps) {
     setIsPasteSubmitting(true);
     setError(null);
     setModalOpen(false); // Close dialog immediately
+    setAddSourceMode('default');
 
     try {
       // Create a text file blob to reuse the existing upload helper
@@ -398,14 +424,14 @@ export function SourcePanel({ className = '', notebookId }: SourcePanelProps) {
       case 'SUBTITLES':
         return <Icon icon="mdi:file-document-outline" className="w-4 h-4 text-muted-foreground" />;
       case 'YOUTUBE':
-        return <Icon icon="mdi:youtube" className="w-4 h-4 text-[#FF4D4D]" />;
+        return <YouTubeIcon className="w-4 h-4" />;
       case 'WEBSITE':
         return <Icon icon="mdi:web" className="w-4 h-4 text-muted-foreground" />;
       case 'GITHUB':
         return <Icon icon="mdi:github" className="w-4 h-4 text-muted-foreground" />;
       default:
         if (urlVal.includes('youtube.com') || urlVal.includes('youtu.be')) {
-          return <Icon icon="mdi:youtube" className="w-4 h-4 text-[#FF4D4D]" />;
+          return <YouTubeIcon className="w-4 h-4" />;
         }
         if (urlVal.includes('github.com')) {
           return <Icon icon="mdi:github" className="w-4 h-4 text-muted-foreground" />;
@@ -472,6 +498,8 @@ export function SourcePanel({ className = '', notebookId }: SourcePanelProps) {
 
     // Close the discovery modal and clear state immediately for better UX
     setDiscoverModalOpen(false);
+    setModalOpen(false);
+    setAddSourceMode('default');
     setSelectedDiscoveredSources([]);
     setSelectAllDiscovered(false);
     setDiscoveredSources([]);
@@ -943,7 +971,10 @@ export function SourcePanel({ className = '', notebookId }: SourcePanelProps) {
                 <Button
                   className="rounded-md px-3 py-1.5 text-xs font-medium"
                   variant="outline"
-                  onClick={() => setDiscoverModalOpen(true)}
+                  onClick={() => {
+                    setAddSourceMode('discover');
+                    setModalOpen(true);
+                  }}
                 >
                   <Search className="w-4 h-4 text-foreground" />
                 </Button>
@@ -952,44 +983,82 @@ export function SourcePanel({ className = '', notebookId }: SourcePanelProps) {
                 <p>Discover sources</p>
               </TooltipContent>
             </Tooltip>
-            <Dialog open={modalOpen} onOpenChange={setModalOpen}>
+            <Dialog
+              open={modalOpen}
+              onOpenChange={(open) => {
+                setModalOpen(open);
+                if (!open) {
+                  setAddSourceMode('default');
+                  setUrl('');
+                  setCopiedText('');
+                }
+              }}
+            >
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <DialogTrigger asChild>
-                    <Button
-                      className="rounded-md px-3 py-1.5 text-xs font-medium"
-                      variant="secondary"
-                    >
-                      <Plus className="w-4 h-4 text-foreground" />
-                    </Button>
-                  </DialogTrigger>
+                  <Button
+                    className="rounded-md px-3 py-1.5 text-xs font-medium"
+                    variant="secondary"
+                    onClick={() => {
+                      setAddSourceMode('default');
+                      setModalOpen(true);
+                    }}
+                  >
+                    <Plus className="w-4 h-4 text-foreground" />
+                  </Button>
                 </TooltipTrigger>
                 <TooltipContent>
                   <p>Add sources</p>
                 </TooltipContent>
               </Tooltip>
-              <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
+              <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col p-6">
                 <DialogHeader>
-                  <DialogTitle>Add Sources</DialogTitle>
-                  <DialogDescription>
-                    Sources let Infera Notebook base its responses on the information that matters
-                    most to you.
-                  </DialogDescription>
+                  <div className="flex items-center gap-2.5">
+                    {addSourceMode !== 'default' && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-8 rounded-lg text-muted-foreground hover:text-foreground shrink-0"
+                        onClick={() => setAddSourceMode('default')}
+                        title="Back to all options"
+                      >
+                        <ArrowLeft className="w-4 h-4" />
+                      </Button>
+                    )}
+                    <div>
+                      <DialogTitle className="text-xl font-semibold">
+                        {addSourceMode === 'default' && 'Add Sources'}
+                        {addSourceMode === 'website' && 'Add Website Link'}
+                        {addSourceMode === 'youtube' && 'Add YouTube Video'}
+                        {addSourceMode === 'text' && 'Paste Text / Markdown'}
+                        {addSourceMode === 'discover' && 'Discover Research Sources'}
+                      </DialogTitle>
+                      <DialogDescription className="text-xs text-muted-foreground mt-0.5">
+                        {addSourceMode === 'default' &&
+                          'Upload files or connect web content to ground your notebook notes and chats.'}
+                        {addSourceMode === 'website' &&
+                          'Enter an article, blog post, documentation, or GitHub repo URL.'}
+                        {addSourceMode === 'youtube' &&
+                          'Enter a YouTube video URL to automatically extract and index its transcript.'}
+                        {addSourceMode === 'text' &&
+                          'Paste text, lecture transcripts, study notes, or raw markdown content.'}
+                        {addSourceMode === 'discover' &&
+                          'Search across the web with AI to find and import authoritative sources.'}
+                      </DialogDescription>
+                    </div>
+                  </div>
                 </DialogHeader>
-                <Tabs defaultValue="upload" className="w-full flex-1 flex flex-col min-h-0">
-                  <TabsList className="grid w-full grid-cols-3 mb-6 shrink-0">
-                    <TabsTrigger value="upload">Upload</TabsTrigger>
-                    <TabsTrigger value="link">Link</TabsTrigger>
-                    <TabsTrigger value="paste">Paste Text</TabsTrigger>
-                  </TabsList>
-                  <TabsContent value="upload">
-                    <div className="w-full max-w-4xl mx-auto">
+
+                <div className="flex-1 overflow-y-auto min-h-0 pt-2 pb-1">
+                  {addSourceMode === 'default' && (
+                    <div className="flex flex-col gap-5">
+                      {/* Drag & Drop File Upload Area */}
                       <div className="relative group">
                         <div
-                          className={`min-h-64 border-2 border-dashed rounded-xl bg-linear-to-br from-neutral-50 to-neutral-100 dark:from-neutral-900 dark:to-neutral-800 transition-all duration-200 ease-in-out cursor-pointer relative overflow-hidden ${
+                          className={`min-h-[180px] border-2 border-dashed rounded-2xl bg-gradient-to-b from-muted/40 via-muted/20 to-transparent transition-all duration-200 cursor-pointer relative overflow-hidden flex flex-col items-center justify-center p-6 text-center ${
                             isDialogDragOver
-                              ? 'border-primary bg-primary/5'
-                              : 'border-neutral-300 dark:border-neutral-700 hover:border-neutral-400 dark:hover:border-neutral-600'
+                              ? 'border-primary bg-primary/10 scale-[0.99]'
+                              : 'border-border/70 hover:border-primary/60 hover:bg-muted/30'
                           }`}
                           onClick={() => fileInputRef.current?.click()}
                           onDragOver={handleDialogDragOver}
@@ -997,159 +1066,491 @@ export function SourcePanel({ className = '', notebookId }: SourcePanelProps) {
                           onDrop={handleDialogDrop}
                         >
                           {isDialogDragOver && (
-                            <div className="absolute inset-0 z-10 flex items-center justify-center bg-primary/10 text-primary font-medium">
+                            <div className="absolute inset-0 z-10 flex items-center justify-center bg-primary/15 text-primary font-medium text-sm backdrop-blur-[1px]">
                               Drop files to upload
                             </div>
                           )}
-                          <div className="absolute inset-0 flex flex-col items-center justify-center p-8 pointer-events-none">
-                            <div className="flex flex-col items-center gap-4 text-center">
-                              <div className="relative">
-                                <div className="w-16 h-16 bg-primary/10 rounded-full shrink-0 flex items-center justify-center mb-4">
-                                  <Plus className="w-8 h-8 text-primary" />
-                                </div>
-                              </div>
-                              <div className="space-y-2">
-                                <h3 className="text-lg font-semibold text-foreground">
-                                  Upload your files
-                                </h3>
-                                <p className="text-sm text-muted-foreground max-w-md">
-                                  Drag and drop files here, or click anywhere to browse
-                                </p>
-                              </div>
-                              <div className="flex flex-wrap justify-center gap-2 mt-4">
-                                <div className="flex items-center gap-1 px-2 py-1 bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 rounded-md text-xs">
-                                  <Icon icon="mdi:file-document-outline" className="w-3 h-3" />
-                                  PDF, DOC, DOCX
-                                </div>
-                                <div className="flex items-center gap-1 px-2 py-1 bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-300 rounded-md text-xs">
-                                  <Icon icon="mdi:file-document-outline" className="w-3 h-3" />
-                                  TXT, MD, CSV
-                                </div>
-                                <div className="flex items-center gap-1 px-2 py-1 bg-purple-50 dark:bg-purple-950/30 text-purple-700 dark:text-purple-300 rounded-md text-xs">
-                                  <Icon icon="mdi:volume-high" className="w-3 h-3" />
-                                  MP3, WAV, M4A
-                                </div>
-                              </div>
-                            </div>
+                          <div className="size-11 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center mb-2.5 group-hover:scale-105 transition-transform">
+                            <Plus className="size-5 text-primary" />
+                          </div>
+                          <h3 className="text-sm font-semibold text-foreground">Upload files</h3>
+                          <p className="text-xs text-muted-foreground mt-1 max-w-sm">
+                            Drag and drop your documents, audio, or video files here, or click to
+                            browse
+                          </p>
+                          <div className="flex flex-wrap justify-center gap-1.5 mt-3 pointer-events-none">
+                            <span className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+                              PDF, DOCX
+                            </span>
+                            <span className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                              TXT, MD, CSV
+                            </span>
+                            <span className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
+                              MP3, WAV, M4A
+                            </span>
                           </div>
                         </div>
                       </div>
-                      <div className="mt-4 text-center">
+
+                      {/* Divider */}
+                      <div className="relative flex items-center justify-center">
+                        <div className="border-t border-border/60 w-full" />
+                        <span className="bg-background px-3 text-xs font-medium text-muted-foreground/80 absolute">
+                          Or choose a source type
+                        </span>
+                      </div>
+
+                      {/* Action Cards Grid */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAddSourceMode('website');
+                            setUrl('');
+                          }}
+                          className="group flex items-start gap-3.5 p-3.5 rounded-xl border border-border/70 bg-card hover:bg-accent/40 hover:border-primary/40 transition-all text-left cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                        >
+                          <div className="size-9 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shrink-0 group-hover:bg-blue-500/20 transition-colors">
+                            <Globe className="size-4 text-blue-500" />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="text-xs font-semibold text-foreground group-hover:text-primary transition-colors">
+                              Website Link
+                            </div>
+                            <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-1">
+                              Import articles, docs, or web pages
+                            </p>
+                          </div>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAddSourceMode('youtube');
+                            setUrl('');
+                          }}
+                          className="group flex items-start gap-3.5 p-3.5 rounded-xl border border-border/70 bg-card hover:bg-accent/40 hover:border-primary/40 transition-all text-left cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                        >
+                          <div className="size-9 rounded-lg bg-red-500/10 border border-red-500/20 flex items-center justify-center shrink-0 group-hover:bg-red-500/20 transition-colors">
+                            <YouTubeIcon className="size-5" />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="text-xs font-semibold text-foreground group-hover:text-primary transition-colors">
+                              YouTube Video
+                            </div>
+                            <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-1">
+                              Transcribe and analyze video content
+                            </p>
+                          </div>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAddSourceMode('text');
+                            setCopiedText('');
+                          }}
+                          className="group flex items-start gap-3.5 p-3.5 rounded-xl border border-border/70 bg-card hover:bg-accent/40 hover:border-primary/40 transition-all text-left cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                        >
+                          <div className="size-9 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0 group-hover:bg-emerald-500/20 transition-colors">
+                            <FileText className="size-4 text-emerald-500" />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="text-xs font-semibold text-foreground group-hover:text-primary transition-colors">
+                              Paste Text
+                            </div>
+                            <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-1">
+                              Paste text excerpts, notes, or markdown
+                            </p>
+                          </div>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAddSourceMode('discover');
+                          }}
+                          className="group flex items-start gap-3.5 p-3.5 rounded-xl border border-border/70 bg-card hover:bg-accent/40 hover:border-primary/40 transition-all text-left cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                        >
+                          <div className="size-9 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shrink-0 group-hover:bg-amber-500/20 transition-colors">
+                            <Sparkles className="size-4 text-amber-500" />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="text-xs font-semibold text-foreground group-hover:text-primary transition-colors">
+                              Discover Sources
+                            </div>
+                            <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-1">
+                              Search the web with AI for research
+                            </p>
+                          </div>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {addSourceMode === 'website' && (
+                    <div className="flex flex-col gap-4 py-2">
+                      <div className="space-y-2">
+                        <Label
+                          htmlFor="website-url"
+                          className="text-xs font-medium text-foreground"
+                        >
+                          Website or Documentation URL
+                        </Label>
+                        <div className="relative">
+                          <input
+                            id="website-url"
+                            type="url"
+                            className="w-full border border-border/80 rounded-xl px-3.5 py-2.5 text-sm bg-background pr-10 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                            placeholder="https://en.wikipedia.org/wiki/... or https://docs.example.com"
+                            value={url}
+                            onChange={(e) => setUrl(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && url.trim() && !isLinkSubmitting) {
+                                handleLinkSubmit();
+                              }
+                            }}
+                            autoFocus
+                          />
+                          <Globe className="w-4 h-4 text-muted-foreground absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                        </div>
                         <p className="text-xs text-muted-foreground">
-                          Maximum file size: 5MB per file • Supported formats: PDF, DOC, DOCX, TXT,
-                          Markdown, CSV, Audio files
+                          Supports web pages, articles, blog posts, and public GitHub repositories.
                         </p>
                       </div>
-                    </div>
-                  </TabsContent>
-                  <TabsContent value="link">
-                    <div className="w-full max-w-2xl mx-auto flex flex-col gap-4 items-center justify-center py-4">
-                      <div className="flex flex-col gap-4 w-full">
-                        <div className="flex flex-col gap-2 w-full">
-                          <Label htmlFor="url-input">URL</Label>
-                          <div className="relative">
-                            <input
-                              id="url-input"
-                              type="url"
-                              className="w-full border rounded px-3 py-2 text-sm pr-20"
-                              placeholder="https://example.com or https://youtube.com/watch?v=..."
-                              value={url}
-                              onChange={(e) => setUrl(e.target.value)}
-                            />
-                            {url.trim() && (
-                              <div className="absolute right-2 top-1/2 transform -translate-y-1/2">
-                                {(() => {
-                                  const linkType = determineLinkType(url.trim());
-                                  const badgeStyles =
-                                    linkType === 'YOUTUBE'
-                                      ? 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300'
-                                      : linkType === 'GITHUB'
-                                        ? 'bg-slate-200 text-slate-800 dark:bg-slate-800 dark:text-slate-200'
-                                        : 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300';
-                                  return (
-                                    <span
-                                      className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full font-medium ${badgeStyles}`}
-                                    >
-                                      {linkType === 'YOUTUBE' ? (
-                                        <>
-                                          <Icon icon="mdi:youtube" className="w-3.5 h-3.5" />
-                                          YouTube
-                                        </>
-                                      ) : linkType === 'GITHUB' ? (
-                                        <>
-                                          <Icon icon="mdi:github" className="w-3.5 h-3.5" />
-                                          GitHub
-                                        </>
-                                      ) : (
-                                        <>
-                                          <Icon icon="mdi:web" className="w-3.5 h-3.5" />
-                                          Website
-                                        </>
-                                      )}
-                                    </span>
-                                  );
-                                })()}
-                              </div>
-                            )}
-                          </div>
-                          <Button
-                            variant="outline"
-                            className="self-end mt-2"
-                            disabled={!url.trim() || isLinkSubmitting}
-                            onClick={handleLinkSubmit}
-                          >
-                            {isLinkSubmitting ? (
-                              <>
-                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                Adding...
-                              </>
-                            ) : (
-                              <>
-                                Add{' '}
-                                {(() => {
-                                  const linkType = determineLinkType(url.trim());
-                                  return linkType === 'YOUTUBE'
-                                    ? 'YouTube'
-                                    : linkType === 'GITHUB'
-                                      ? 'GitHub'
-                                      : 'Website';
-                                })()}
-                              </>
-                            )}
-                          </Button>
-                        </div>
+                      <div className="flex justify-between items-center pt-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setAddSourceMode('default')}
+                        >
+                          Back
+                        </Button>
+                        <Button
+                          disabled={!url.trim() || isLinkSubmitting}
+                          onClick={handleLinkSubmit}
+                          className="gap-2"
+                        >
+                          {isLinkSubmitting ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              Adding...
+                            </>
+                          ) : (
+                            'Add Website'
+                          )}
+                        </Button>
                       </div>
                     </div>
-                  </TabsContent>
-                  <TabsContent value="paste">
-                    <div className="w-full max-w-2xl mx-auto flex flex-col gap-4 py-4">
-                      <ScrollArea className="h-[200px] w-full border rounded-md">
-                        <Textarea
-                          id="copied-text"
-                          className="w-full border-0 resize-none min-h-[200px]"
-                          placeholder="Paste your text here..."
-                          value={copiedText}
-                          onChange={(e) => setCopiedText(e.target.value)}
-                        />
-                      </ScrollArea>
-                      <Button
-                        variant="outline"
-                        className="self-end mt-2"
-                        disabled={!copiedText.trim() || isPasteSubmitting}
-                        onClick={handlePasteSubmit}
-                      >
-                        {isPasteSubmitting ? (
-                          <>
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                            Adding...
-                          </>
-                        ) : (
-                          'Add Text'
-                        )}
-                      </Button>
+                  )}
+
+                  {addSourceMode === 'youtube' && (
+                    <div className="flex flex-col gap-4 py-2">
+                      <div className="space-y-2">
+                        <Label
+                          htmlFor="youtube-url"
+                          className="text-xs font-medium text-foreground"
+                        >
+                          YouTube Video URL
+                        </Label>
+                        <div className="relative">
+                          <input
+                            id="youtube-url"
+                            type="url"
+                            className="w-full border border-border/80 rounded-xl px-3.5 py-2.5 text-sm bg-background pr-10 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                            placeholder="https://www.youtube.com/watch?v=... or https://youtu.be/..."
+                            value={url}
+                            onChange={(e) => setUrl(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && url.trim() && !isLinkSubmitting) {
+                                handleLinkSubmit();
+                              }
+                            }}
+                            autoFocus
+                          />
+                          <YouTubeIcon className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          We will extract the video transcript so your AI co-pilot can cite and
+                          reference it.
+                        </p>
+                      </div>
+                      <div className="flex justify-between items-center pt-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setAddSourceMode('default')}
+                        >
+                          Back
+                        </Button>
+                        <Button
+                          disabled={!url.trim() || isLinkSubmitting}
+                          onClick={handleLinkSubmit}
+                          className="gap-2"
+                        >
+                          {isLinkSubmitting ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              Adding...
+                            </>
+                          ) : (
+                            'Add YouTube Video'
+                          )}
+                        </Button>
+                      </div>
                     </div>
-                  </TabsContent>
-                </Tabs>
+                  )}
+
+                  {addSourceMode === 'text' && (
+                    <div className="flex flex-col gap-4 py-2">
+                      <div className="space-y-2">
+                        <Label
+                          htmlFor="copied-text"
+                          className="text-xs font-medium text-foreground"
+                        >
+                          Paste Text or Markdown Content
+                        </Label>
+                        <ScrollArea className="h-[220px] w-full border border-border/80 rounded-xl bg-background">
+                          <Textarea
+                            id="copied-text"
+                            className="w-full border-0 resize-none min-h-[220px] p-3.5 text-sm focus-visible:ring-0 focus-visible:ring-offset-0"
+                            placeholder="Paste your research, transcript, book summary, or notes here..."
+                            value={copiedText}
+                            onChange={(e) => setCopiedText(e.target.value)}
+                            autoFocus
+                          />
+                        </ScrollArea>
+                        <div className="flex justify-between text-xs text-muted-foreground">
+                          <span>Supports plain text and markdown</span>
+                          <span>{copiedText.length} characters</span>
+                        </div>
+                      </div>
+                      <div className="flex justify-between items-center pt-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setAddSourceMode('default')}
+                        >
+                          Back
+                        </Button>
+                        <Button
+                          disabled={!copiedText.trim() || isPasteSubmitting}
+                          onClick={handlePasteSubmit}
+                          className="gap-2"
+                        >
+                          {isPasteSubmitting ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              Adding...
+                            </>
+                          ) : (
+                            'Add Text Source'
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {addSourceMode === 'discover' && (
+                    <div className="flex flex-col gap-4 py-2">
+                      <div className="space-y-3">
+                        <Label
+                          htmlFor="discover-interest"
+                          className="text-xs font-medium text-foreground"
+                        >
+                          What topic are you researching?
+                        </Label>
+                        <Textarea
+                          id="discover-interest"
+                          placeholder="Tell us what you're looking for (e.g. quantum computing breakthrough, renewable energy economics)..."
+                          value={discoverInterest}
+                          onChange={(e) => setDiscoverInterest(e.target.value)}
+                          className="min-h-[100px] resize-none rounded-xl"
+                        />
+                      </div>
+                      <div className="flex flex-wrap gap-2.5">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex items-center gap-1.5 text-xs rounded-lg"
+                          onClick={() => {
+                            const curiousPrompts = [
+                              'Artificial intelligence and machine learning advancements',
+                              'Latest developments in fusion and renewable energy',
+                              'Space exploration and deep astronomy',
+                              'Modern cognitive productivity techniques',
+                              'Decentralized systems and smart contracts',
+                              'Quantum computing principles and architecture',
+                            ];
+                            const randomPrompt =
+                              curiousPrompts[Math.floor(Math.random() * curiousPrompts.length)];
+                            setDiscoverInterest(randomPrompt);
+                          }}
+                        >
+                          <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                          <span>I'm feeling curious</span>
+                        </Button>
+                        <Button
+                          className="flex-1 text-xs"
+                          size="sm"
+                          disabled={!discoverInterest.trim() || isDiscovering}
+                          onClick={handleDiscoverSubmit}
+                        >
+                          {isDiscovering ? (
+                            <>
+                              <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" />
+                              Discovering Sources...
+                            </>
+                          ) : (
+                            'Search Sources'
+                          )}
+                        </Button>
+                      </div>
+
+                      {isDiscovering && (
+                        <div className="border-t border-border/60 pt-4 space-y-3">
+                          <h4 className="text-xs font-medium text-muted-foreground">
+                            Finding sources on the web...
+                          </h4>
+                          {Array.from({ length: 3 }).map((_, index) => (
+                            <div
+                              key={index}
+                              className="flex items-start space-x-3 p-3.5 border rounded-xl"
+                            >
+                              <Skeleton className="h-4 w-4 rounded mt-1" />
+                              <div className="flex-1 space-y-2">
+                                <Skeleton className="h-4 w-3/4" />
+                                <Skeleton className="h-3 w-full" />
+                                <Skeleton className="h-3 w-2/3" />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {!isDiscovering && discoverInterest && discoveredSources.length === 0 && (
+                        <div className="border-t border-border/60 pt-4 text-center py-6 text-muted-foreground">
+                          <Search className="w-7 h-7 mx-auto mb-1.5 opacity-60" />
+                          <p className="text-xs font-medium">No sources found for this search</p>
+                          <p className="text-[11px] opacity-70">
+                            Try adjusting your keywords or topic
+                          </p>
+                        </div>
+                      )}
+
+                      {!isDiscovering && discoveredSources.length > 0 && (
+                        <div className="space-y-3 border-t border-border/60 pt-3">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <h4 className="text-xs font-semibold text-foreground">
+                                Discovered Sources ({discoveredSources.length})
+                              </h4>
+                              <p className="text-[11px] text-muted-foreground">
+                                Select sources to import into this notebook
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Checkbox
+                                id="select-all-discovered"
+                                checked={
+                                  selectAllDiscovered ||
+                                  (discoveredSources.length > 0 &&
+                                    selectedDiscoveredSources.length === discoveredSources.length)
+                                }
+                                onCheckedChange={(checked) => {
+                                  const isChecked = checked === true;
+                                  setSelectAllDiscovered(isChecked);
+                                  setSelectedDiscoveredSources(
+                                    isChecked ? discoveredSources.map((_, idx) => idx) : []
+                                  );
+                                }}
+                              />
+                              <Label
+                                htmlFor="select-all-discovered"
+                                className="text-xs cursor-pointer"
+                              >
+                                Select All
+                              </Label>
+                            </div>
+                          </div>
+
+                          <div className="max-h-[240px] overflow-y-auto space-y-2 border rounded-xl p-2.5">
+                            {discoveredSources.map((source, index) => (
+                              <div
+                                key={`${source.url}-${index}`}
+                                className="flex items-start space-x-3 p-2.5 border border-border/60 rounded-lg hover:bg-muted/40 transition-colors"
+                              >
+                                <Checkbox
+                                  className="mt-1"
+                                  checked={
+                                    selectAllDiscovered || selectedDiscoveredSources.includes(index)
+                                  }
+                                  onCheckedChange={(checked) => {
+                                    const isChecked = checked === true;
+                                    setSelectAllDiscovered(false);
+                                    setSelectedDiscoveredSources((prev) =>
+                                      isChecked ? [...prev, index] : prev.filter((i) => i !== index)
+                                    );
+                                  }}
+                                />
+                                <div className="flex items-start space-x-2.5 flex-1 min-w-0">
+                                  <div className="shrink-0 mt-0.5">
+                                    {source.favicon ? (
+                                      <img
+                                        src={source.favicon}
+                                        alt=""
+                                        className="w-4 h-4 rounded"
+                                        onError={(e) => {
+                                          e.currentTarget.style.display = 'none';
+                                        }}
+                                      />
+                                    ) : (
+                                      <Globe className="w-4 h-4 text-muted-foreground" />
+                                    )}
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <h5 className="font-medium text-xs truncate">{source.title}</h5>
+                                    <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-2">
+                                      {source.content}
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+
+                          <div className="flex justify-between items-center pt-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setAddSourceMode('default')}
+                            >
+                              Back
+                            </Button>
+                            <Button
+                              size="sm"
+                              disabled={selectedDiscoveredSources.length === 0 || isImporting}
+                              className="gap-2"
+                              onClick={handleImportSelected}
+                            >
+                              {isImporting ? (
+                                <>
+                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                  Importing...
+                                </>
+                              ) : (
+                                <>
+                                  <Plus className="w-3.5 h-3.5" />
+                                  Import Selected ({selectedDiscoveredSources.length})
+                                </>
+                              )}
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </DialogContent>
             </Dialog>
           </div>

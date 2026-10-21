@@ -1,15 +1,7 @@
 import { useState } from 'react';
-import type { AllowedNoteType, Status } from '@/generated/prisma/enums';
+import type { SelectedNote } from '@/types/notes';
 
-export interface SelectedNote {
-  id: string;
-  noteTitle: string;
-  type: AllowedNoteType;
-  status: Status;
-  createdAt: Date;
-  content?: string;
-  sources?: { id: string }[];
-}
+export type { SelectedNote };
 
 /**
  * Simple hook to manage the state of the currently selected/active note.

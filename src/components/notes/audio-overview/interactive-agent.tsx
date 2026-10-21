@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useRef, useState, useMemo, useEffect, useCallback } from 'react';
-import { useGeminiLive, type GeminiLiveCallbacks } from '@/hooks/useGeminiLive';
+import { useGeminiLive, type GeminiLiveCallbacks } from '@/hooks/use-gemini-live';
 import { Button } from '@/components/ui/button';
 import { Mic, MicOff, Volume2, VolumeX, X, Power } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { Orb, type AgentState as OrbState } from '@/components/ui/orb';
 import { BarVisualizer, type AgentState as BarState } from '@/components/ui/bar-visualizer';
-import { useNotebookStore } from '@/hooks/useNotebookStore';
+import { useNotebookStore } from '@/hooks/use-notebook-store';
 import {
   VOICE_CONTEXT_MAX_CHARS,
   DEFAULT_SPEAKER_NAME,

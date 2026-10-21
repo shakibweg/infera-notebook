@@ -14,19 +14,19 @@ export function createTools(context: ToolContext): Record<string, InferaTool> {
   const searchInVectorStore: InferaTool = {
     name: 'searchInVectorStore',
     description:
-      'Search for relevant content in the knowledge base (vector store) to answer user questions with accurate context.',
+      'Search the notebook vector store for relevant excerpts, documents, and notes to answer user questions with verified context. Always call this tool when answering questions about user materials, explaining documents, or retrieving facts.',
     schema: z.object({
       query: z
         .string()
         .describe(
-          'The specific search query string to find relevant note snippets or document sections.'
+          'The semantic search query string. For broad questions (e.g. "explain the doc", "overview"), use descriptive keywords representing the core topic, introduction, or main concepts. For follow-up questions (e.g. "explain them", "tell me more"), resolve pronouns using conversation history into a standalone topic query rather than literal conversational phrases.'
         ),
     }),
     execute: async ({ query }) => {
       const vs = await initializeVectorStore();
       const filter: any = { userId: context.userId, notebookId: context.notebookId };
       if (context.sourceIds?.length) filter.sourceId = { $in: context.sourceIds };
-      const results = await vs!.similaritySearch(query, 10, filter);
+      const results = await vs!.similaritySearch(query, 25, filter);
       return {
         success: true,
         results: results.map((d) => ({

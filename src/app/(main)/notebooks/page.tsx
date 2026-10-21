@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { UserButtonSimpleTheme } from '@/components/user/user-button-simple-theme';
 import { ModeToggle } from '@/components/theme/mode-toggle';
-import { Notebook, useNotebookStore } from '@/hooks/useNotebookStore';
+import { Notebook, useNotebookStore } from '@/hooks/use-notebook-store';
 import {
   Dialog,
   DialogContent,
@@ -165,7 +165,7 @@ function NotebooksPageContent() {
 
   /**
    * Sends a POST request to create a new notebook.
-   * Triggers a re-fetch of the first page upon success.
+   * Redirects user to the newly created notebook upon success.
    */
   const createNotebook = async () => {
     try {
@@ -177,23 +177,15 @@ function NotebooksPageContent() {
         body: JSON.stringify({ title }),
       });
       if (!res.ok) throw new Error('Failed to create notebook');
+      const data = await res.json();
 
       setCreateDialogOpen(false);
       setNewNotebookName('');
-
-      // Reset search state immediately
-      setLocalSearch('');
-      setDebouncedSearch('');
-
-      // If we're already on page 1 with no search, the useEffect won't trigger re-fetch
-      // because the state hasn't changed. In that case, we manually fetch.
-      if (pageFromUrl === 1 && debouncedSearch === '') {
-        fetchNotebooks(1, '');
-      } else {
-        // Otherwise, updating URL will trigger the useEffect because pageFromUrl or search will change
-        updateUrl({ page: '1' });
-      }
       toast.success('Notebook created successfully');
+
+      if (data?.notebook?.id) {
+        router.push(`/notebooks/${data.notebook.id}`);
+      }
     } catch (err) {
       console.error(err);
       toast.error('Failed to create notebook');

@@ -9,7 +9,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Loader2 } from 'lucide-react';
-import type { SelectedNote } from '@/hooks/useSelectedNote';
+import type { SelectedNote } from '@/hooks/use-selected-note';
 import { useTheme } from 'next-themes';
 import '@blocknote/core/fonts/inter.css';
 import { useCreateBlockNote, useEditorChange } from '@blocknote/react';

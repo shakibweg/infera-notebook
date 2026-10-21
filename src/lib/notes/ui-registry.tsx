@@ -23,21 +23,82 @@ import {
 } from 'lucide-react';
 
 import { AllowedNoteType } from '@/generated/prisma/enums';
-import type { SelectedNote } from '@/hooks/useSelectedNote';
+import type { SelectedNote } from '@/hooks/use-selected-note';
 
-// Import specific view components for each note type
-import { FaqNoteView } from '@/components/notes/faq/faq-note-view';
-import { MindmapNoteView } from '@/components/notes/mindmap/mindmap-note-view';
-import { TimelineNoteView } from '@/components/notes/timeline/timeline-note-view';
-import { BriefingNoteView } from '@/components/notes/briefing/briefing-note-view';
-import { QuizNoteView } from '@/components/notes/quiz/quiz-note-view';
-import { FlashCardsNoteView } from '@/components/notes/flash-cards/flash-cards-note-view';
-import { InfographicNoteView } from '@/components/notes/infographic/infographic-note-view';
-import { SlideDeckNoteView } from '@/components/notes/slide-deck/slide-deck-note-view';
-import { AudioOverviewNoteView } from '@/components/notes/audio-overview/audio-overview-note-view';
-import { VideoOverviewNoteView } from '@/components/notes/video-overview/video-overview-note-view';
-import { EditableNoteView } from '@/components/notes/editable-note/editable-note-view';
-import { ChatNoteView } from '@/components/notes/chat-note/chat-note-view';
+import dynamic from 'next/dynamic';
+import { Skeleton } from '@/components/ui/skeleton';
+
+const ViewLoading = () => (
+  <div className="flex flex-col gap-3 p-4 w-full">
+    <Skeleton className="h-8 w-1/3" />
+    <Skeleton className="h-32 w-full" />
+    <Skeleton className="h-24 w-full" />
+  </div>
+);
+
+// Dynamically import view components to avoid bundling heavy libraries (ReactFlow, Wavesurfer, BlockNote, Remotion) on initial load
+const FaqNoteView = dynamic(
+  () => import('@/components/notes/faq/faq-note-view').then((m) => m.FaqNoteView),
+  { loading: ViewLoading, ssr: false }
+);
+const MindmapNoteView = dynamic(
+  () => import('@/components/notes/mindmap/mindmap-note-view').then((m) => m.MindmapNoteView),
+  { loading: ViewLoading, ssr: false }
+);
+const TimelineNoteView = dynamic(
+  () => import('@/components/notes/timeline/timeline-note-view').then((m) => m.TimelineNoteView),
+  { loading: ViewLoading, ssr: false }
+);
+const BriefingNoteView = dynamic(
+  () => import('@/components/notes/briefing/briefing-note-view').then((m) => m.BriefingNoteView),
+  { loading: ViewLoading, ssr: false }
+);
+const QuizNoteView = dynamic(
+  () => import('@/components/notes/quiz/quiz-note-view').then((m) => m.QuizNoteView),
+  { loading: ViewLoading, ssr: false }
+);
+const FlashCardsNoteView = dynamic(
+  () =>
+    import('@/components/notes/flash-cards/flash-cards-note-view').then(
+      (m) => m.FlashCardsNoteView
+    ),
+  { loading: ViewLoading, ssr: false }
+);
+const InfographicNoteView = dynamic(
+  () =>
+    import('@/components/notes/infographic/infographic-note-view').then(
+      (m) => m.InfographicNoteView
+    ),
+  { loading: ViewLoading, ssr: false }
+);
+const SlideDeckNoteView = dynamic(
+  () =>
+    import('@/components/notes/slide-deck/slide-deck-note-view').then((m) => m.SlideDeckNoteView),
+  { loading: ViewLoading, ssr: false }
+);
+const AudioOverviewNoteView = dynamic(
+  () =>
+    import('@/components/notes/audio-overview/audio-overview-note-view').then(
+      (m) => m.AudioOverviewNoteView
+    ),
+  { loading: ViewLoading, ssr: false }
+);
+const VideoOverviewNoteView = dynamic(
+  () =>
+    import('@/components/notes/video-overview/video-overview-note-view').then(
+      (m) => m.VideoOverviewNoteView
+    ),
+  { loading: ViewLoading, ssr: false }
+);
+const EditableNoteView = dynamic(
+  () =>
+    import('@/components/notes/editable-note/editable-note-view').then((m) => m.EditableNoteView),
+  { loading: ViewLoading, ssr: false }
+);
+const ChatNoteView = dynamic(
+  () => import('@/components/notes/chat-note/chat-note-view').then((m) => m.ChatNoteView),
+  { loading: ViewLoading, ssr: false }
+);
 
 // Alias for SelectedNote type used throughout the UI
 export type Note = SelectedNote;

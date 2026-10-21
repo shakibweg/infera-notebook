@@ -18,6 +18,10 @@ export class AudioStreamer {
     this.client = client;
   }
 
+  public setClient(client: GeminiLiveAPIClient) {
+    this.client = client;
+  }
+
   async start(deviceId: string | null = null) {
     if (this.isStreaming) return;
 

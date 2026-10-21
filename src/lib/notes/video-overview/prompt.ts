@@ -28,20 +28,23 @@ Transform the provided source document into a compelling video narration script.
 </task>
 
 <instructions>
-1. Craft an attention-grabbing title.
+1. Craft an attention-grabbing, substantive title (strictly 3 to 6 words, Title Case, never generic "Video Overview").
 2. Select 1 or 2 voices from the available speakers.
-3. Write a narration script suitable for TTS. If using two voices, use the format:
-   SpeakerName: [audio tag] Text.
-4. If using one voice, you can still use [audio tags] for delivery.
-5. Keep the script under 1000 characters.
-6. Identify 3-5 key terms (specialized terminology, names, or brands) mentioned in the script.
+3. Write a narration script suitable for TTS:
+   - Hook: Start immediately with an intriguing premise or question in the first sentence.
+   - Core Story: Deliver the main insight with high clarity and narrative momentum.
+   - Conclusion: End with a resonant takeaway.
+   - If using two voices, format as: SpeakerName: [audio tag] Text.
+   - If using one voice, format as: [audio tags] Text.
+4. Keep the total script under 1000 characters.
+5. Identify 3-5 key terms (specialized terminology, names, or brands) mentioned in the script.
 </instructions>
 
 <constraints>
 - The script MUST be under 1000 characters total.
-- Use short, punchy sentences.
-- Avoid jargon.
-- Do NOT invent information.
+- Use short, punchy sentences tailored for spoken video delivery.
+- Avoid unnecessary jargon or dense written syntax.
+- Do NOT invent information not present in the document.
 </constraints>
 
 <context>
@@ -56,7 +59,11 @@ ${document}
 export const SCRIPT_SCHEMA = {
   type: 'object' as const,
   properties: {
-    title: { type: 'string', description: 'An attention-grabbing video title' },
+    title: {
+      type: 'string',
+      description:
+        'An attention-grabbing title (strictly 3 to 6 words, Title Case, focusing on the substantive subject)',
+    },
     participants: {
       type: 'array',
       description: 'The selected 1-2 voices for this video',

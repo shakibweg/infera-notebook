@@ -59,12 +59,12 @@ import {
 } from 'lucide-react';
 import { AllowedNoteType, Status } from '@/generated/prisma/enums';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { useNotebookStore } from '@/hooks/useNotebookStore';
-import { useSelectedNote, type SelectedNote } from '@/hooks/useSelectedNote';
+import { useNotebookStore } from '@/hooks/use-notebook-store';
+import { useSelectedNote, type SelectedNote } from '@/hooks/use-selected-note';
 import { FAQ_NOTE_TYPE } from '@/types/notes';
 import { DefaultNoteView, noteContentRegistry, noteNodes } from '@/lib/notes/ui-registry';
 import { useInngestSubscription } from '@inngest/realtime/hooks';
-import { fetchNotebookRealtimeSubscriptionToken } from '@/actions/inngest-realtime';
+import { fetchNotebookRealtimeSubscriptionToken } from '@/inngest/realtime';
 import { InteractiveAgent } from '@/components/notes/audio-overview/interactive-agent';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -136,12 +136,20 @@ const typeIcon = (type: AllowedNoteType) => {
  * - Multi-view support for different note types.
  */
 export function NotesPanel({ className = '', notebookId }: NotesPanelProps) {
-  const [notes, setNotes] = useState<Note[]>([]);
+  const {
+    selectedSourceIds,
+    fetchCredits,
+    notes,
+    setNotes,
+    addNote: addStoreNote,
+    updateNote: updateStoreNote,
+    removeNote: removeStoreNote,
+    clearNotes,
+  } = useNotebookStore();
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isNoteDetailLoading, setIsNoteDetailLoading] = useState(false);
-  const { selectedSourceIds, fetchCredits } = useNotebookStore();
   const hasSelectedSources = selectedSourceIds.length > 0;
   const { selectedNote, setSelectedNote, isNoteSelected } = useSelectedNote();
   const [selectedFaq, setSelectedFaq] = useState<any[] | null>(null);
@@ -205,17 +213,10 @@ export function NotesPanel({ className = '', notebookId }: NotesPanelProps) {
     };
     if (!noteId || !status) return;
 
-    setNotes((prev) =>
-      prev.map((n) =>
-        n.id === noteId
-          ? {
-              ...n,
-              status,
-              noteTitle: noteTitle ?? n.noteTitle,
-            }
-          : n
-      )
-    );
+    updateStoreNote(noteId, {
+      status,
+      noteTitle: noteTitle ?? undefined,
+    });
 
     // Keep currently selected note in sync as well
     setSelectedNote((prev) =>
@@ -269,66 +270,18 @@ export function NotesPanel({ className = '', notebookId }: NotesPanelProps) {
     } finally {
       setLoading(false);
     }
-  }, [resolvedNotebookId]);
+  }, [resolvedNotebookId, setNotes]);
 
   useEffect(() => {
     fetchNotes();
   }, [fetchNotes]);
 
-  // Listen for note creation/update events from ChatsPanel
+  // Keep selectedNote synchronized with notes store (e.g. if note is deleted or all notes cleared)
   useEffect(() => {
-    const handleNoteCreated = (event: CustomEvent) => {
-      const noteData = event.detail;
-      const newNote: Note = {
-        id: noteData.id,
-        noteTitle: noteData.noteTitle,
-        type: noteData.type,
-        status: noteData.status,
-        createdAt: noteData.createdAt,
-        content: noteData.content || '',
-      };
-      setNotes((prev) => [newNote, ...prev]);
-    };
-
-    const handleNoteUpdated = (event: CustomEvent) => {
-      const noteData = event.detail;
-      setNotes((prev) =>
-        prev.map((n) =>
-          n.id === noteData.id
-            ? {
-                ...n,
-                noteTitle: noteData.noteTitle ?? n.noteTitle,
-                status: noteData.status ?? n.status,
-                createdAt: noteData.createdAt ?? n.createdAt,
-                content: noteData.content ?? n.content,
-              }
-            : n
-        )
-      );
-    };
-
-    const handleNoteFailed = (event: CustomEvent) => {
-      const { id } = event.detail;
-      setNotes((prev) => prev.filter((n) => n.id !== id));
-    };
-
-    const handleNoteClearAll = () => {
-      setNotes([]);
+    if (selectedNote && !notes.some((n) => n.id === selectedNote.id)) {
       setSelectedNote(null);
-    };
-
-    window.addEventListener('note:created', handleNoteCreated as EventListener);
-    window.addEventListener('note:updated', handleNoteUpdated as EventListener);
-    window.addEventListener('note:failed', handleNoteFailed as EventListener);
-    window.addEventListener('note:clear-all', handleNoteClearAll as EventListener);
-
-    return () => {
-      window.removeEventListener('note:created', handleNoteCreated as EventListener);
-      window.removeEventListener('note:updated', handleNoteUpdated as EventListener);
-      window.removeEventListener('note:failed', handleNoteFailed as EventListener);
-      window.removeEventListener('note:clear-all', handleNoteClearAll as EventListener);
-    };
-  }, []);
+    }
+  }, [notes, selectedNote, setSelectedNote]);
 
   const anyProcessing = useMemo(() => notes.some((n) => n.status === Status.PROCESSING), [notes]);
 
@@ -349,7 +302,7 @@ export function NotesPanel({ className = '', notebookId }: NotesPanelProps) {
       content: '',
       sources,
     };
-    setNotes((prev) => [newNote, ...prev]);
+    addStoreNote(newNote);
   };
 
   /**
@@ -511,7 +464,7 @@ export function NotesPanel({ className = '', notebookId }: NotesPanelProps) {
 
     // Optimistically remove the note from UI immediately
     const noteToDelete = notes.find((n) => n.id === id) || null;
-    setNotes((prev) => prev.filter((n) => n.id !== id));
+    removeStoreNote(id);
 
     try {
       await fetch(`/api/notebooks/${resolvedNotebookId}/notes`, {
@@ -523,7 +476,7 @@ export function NotesPanel({ className = '', notebookId }: NotesPanelProps) {
       console.error('[NotesPanel] Failed to delete note:', error);
       // Optional rollback on error
       if (noteToDelete) {
-        setNotes((prev) => [noteToDelete, ...prev]);
+        addStoreNote(noteToDelete);
       }
     } finally {
       setDeletingId(null);
