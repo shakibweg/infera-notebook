@@ -1,19 +1,19 @@
 import { AllowedSourceType } from '@/generated/prisma/enums';
 import type { SourceVectorizer } from './utils';
 
-import { pdfToVector } from './pdfToVector';
-import { csvToVector } from './csvToVector';
-import { youtubeToVector } from './youtubeToVector';
-import { websiteToVector } from './websiteToVector';
-import { audioToVector } from './audioToVector';
-import { githubToVector } from './githubToVector';
-import { jsonToVector } from './jsonToVector';
-import { jsonLinesToVector } from './jsonLinesToVector';
-import { txtToVector } from './txtToVector';
-import { docxToVector } from './docxToVector';
-import { epubToVector } from './epubToVector';
-import { pptxToVector } from './pptxToVector';
-import { srtToVector } from './srtToVector';
+import { pdfToVector } from './pdf-to-vector';
+import { csvToVector } from './csv-to-vector';
+import { youtubeToVector } from './youtube-to-vector';
+import { websiteToVector } from './website-to-vector';
+import { audioToVector } from './audio-to-vector';
+import { githubToVector } from './github-to-vector';
+import { jsonToVector } from './json-to-vector';
+import { jsonLinesToVector } from './json-lines-to-vector';
+import { txtToVector } from './txt-to-vector';
+import { docxToVector } from './docx-to-vector';
+import { epubToVector } from './epub-to-vector';
+import { pptxToVector } from './pptx-to-vector';
+import { srtToVector } from './srt-to-vector';
 
 /**
  * Source Vectorizer Registry

@@ -14,8 +14,9 @@
     "db:reset": "prisma migrate reset",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "bucket:setup": "ts-node scripts/setup-bucket.ts",
-    "bucket:teardown": "ts-node scripts/teardown-bucket.ts",
+    "bucket:reset": "ts-node scripts/reset-bucket.ts",
+    "pinecone:reset": "ts-node scripts/reset-pinecone.ts",
+    "inngest:dev": "inngest dev",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -79,6 +80,7 @@
     "@types/three": "^0.183.1",
     "@xyflow/react": "^12.10.0",
     "ai": "^6.0.116",
+    "apify-client": "^2.25.0",
     "assemblyai": "^4.22.1",
     "better-auth": "^1.4.7",
     "class-variance-authority": "^0.7.1",
