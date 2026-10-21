@@ -1,8 +1,36 @@
+import { z } from 'zod';
+
 /**
- * Centralized environment variable access.
+ * Centralized environment variable access and validation.
  * This file serves as the single point of truth for server-side environment configurations,
  * allowing for easier validation and management of sensitive API keys and URLs.
  */
+
+export const envSchema = z.object({
+  GEMINI_API_KEY: z.string().min(1, 'GEMINI_API_KEY is required').optional(),
+  GOOGLE_API_KEY: z.string().min(1).optional(),
+  PINECONE_API_KEY: z.string().min(1).optional(),
+  PINECONE_INDEX: z.string().min(1).optional(),
+  AWS_S3_BUCKET_NAME: z.string().min(1).optional(),
+  BETTER_AUTH_SECRET: z.string().min(1).optional(),
+});
+
+/**
+ * Diagnostic helper to check if essential environment variables are set.
+ * Returns true if valid or logs formatted warnings if any keys are missing.
+ */
+export function checkRequiredEnv(): { valid: boolean; missing: string[] } {
+  const missing: string[] = [];
+  if (!process.env.GEMINI_API_KEY && !process.env.GOOGLE_API_KEY) missing.push('GEMINI_API_KEY');
+  if (!process.env.PINECONE_API_KEY) missing.push('PINECONE_API_KEY');
+  if (!process.env.PINECONE_INDEX) missing.push('PINECONE_INDEX');
+  if (!process.env.AWS_S3_BUCKET_NAME) missing.push('AWS_S3_BUCKET_NAME');
+
+  if (missing.length > 0 && process.env.NODE_ENV === 'production') {
+    console.warn(`[ENV] Warning: Missing critical environment variables: ${missing.join(', ')}`);
+  }
+  return { valid: missing.length === 0, missing };
+}
 
 // --- CORE AI SERVICES ---
 /** Gemini API Key for Gemini models */
@@ -40,9 +68,11 @@ export const AWS_FORCE_PATH_STYLE =
 // --- CLOUDFLARE AI GATEWAY ---
 // Removed gateway configuration
 
-// --- SEARCH TOOLS ---
+// --- SEARCH TOOLS & SCRAPERS ---
 /** Tavily search API key for web-aware AI capabilities */
 export const TAVILY_API_KEY = process.env.TAVILY_API_KEY || '';
+/** Apify API token for web scraping and YouTube transcription */
+export const APIFY_API_TOKEN = process.env.APIFY_API_TOKEN || process.env.APIFY_TOKEN || '';
 
 // --- AUTH ---
 export const BETTER_AUTH_SECRET =

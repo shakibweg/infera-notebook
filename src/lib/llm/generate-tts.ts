@@ -1,5 +1,6 @@
 import { GoogleGenAI } from '@google/genai';
 import { GEMINI_API_KEY } from './config';
+import { TTS_ROUTER_MODELS, type TTSRouterModel } from './model-router';
 
 export interface TTSOptions {
   text: string;
@@ -13,6 +14,7 @@ export interface TTSResult {
   success: boolean;
   buffer?: Buffer;
   error?: string;
+  modelUsed?: TTSRouterModel;
 }
 
 /**
@@ -38,17 +40,18 @@ function addWavHeader(pcmBuffer: Buffer, sampleRate: number = 24000): Buffer {
 }
 
 /**
- * Gemini Text-to-Speech (TTS) Generation
- * Supports both single-speaker and multi-speaker modes using the official SDK.
- * Implements retry logic as recommended by documentation for transient 500 errors.
+ * Gemini Text-to-Speech (TTS) Generation with Model Router Fallback
+ * Cascades across TTS_ROUTER_MODELS (gemini-3.8-flash-tts -> gemini-3.8-flash-lite-tts -> gemini-3.1-flash-tts-preview -> gemini-2.5-flash-preview-tts)
+ * to maximize rate limits and prevent 429/500 generation failures.
  */
-export async function generateTTS(options: TTSOptions, retries = 3): Promise<TTSResult> {
+export async function generateTTS(options: TTSOptions): Promise<TTSResult> {
   const { text, voice = 'Zephyr', multiSpeaker } = options;
-  const model = 'gemini-3.1-flash-tts-preview';
+  const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+  const modelErrors: Record<string, string> = {};
 
-  for (let i = 0; i < retries; i++) {
+  for (const model of TTS_ROUTER_MODELS) {
     try {
-      const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+      console.log(`[TTS Router] Attempting audio generation with model: "${model}"`);
 
       const config: any = {
         responseModalities: ['AUDIO'],
@@ -82,30 +85,27 @@ export async function generateTTS(options: TTSOptions, retries = 3): Promise<TTS
       const data = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
 
       if (!data) {
-        // Check for common reasons for missing data (e.g. content blocking)
         const finishReason = response.candidates?.[0]?.finishReason;
         if (finishReason === 'SAFETY') {
-          throw new Error('TTS generation failed due to safety filters.');
+          throw new Error(`TTS generation blocked by safety filters.`);
         }
-        throw new Error('No audio data returned from Gemini TTS');
+        throw new Error(`No audio data returned from model "${model}".`);
       }
 
       const pcmBuffer = Buffer.from(data, 'base64');
       const wavBuffer = addWavHeader(pcmBuffer);
 
-      return { success: true, buffer: wavBuffer };
+      console.log(`[TTS Router] Successfully generated audio using model: "${model}"`);
+      return { success: true, buffer: wavBuffer, modelUsed: model };
     } catch (error: any) {
-      console.error(`[GENERATE_TTS_ATTEMPT_${i + 1}_FAILED]`, error.message);
-
-      // If it's the last attempt, or if it's not a transient error, throw/return error
-      if (i === retries - 1) {
-        return { success: false, error: error.message };
-      }
-
-      // Wait a bit before retrying (exponential backoff)
-      await new Promise((resolve) => setTimeout(resolve, Math.pow(2, i) * 1000));
+      const msg = error?.message || String(error);
+      console.warn(`[TTS Router] Model "${model}" failed: ${msg}. Routing to fallback model...`);
+      modelErrors[model] = msg;
     }
   }
 
-  return { success: false, error: 'Maximum retries reached' };
+  return {
+    success: false,
+    error: `All Gemini TTS models failed: ${JSON.stringify(modelErrors)}`,
+  };
 }
