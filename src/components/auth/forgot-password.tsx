@@ -1,24 +1,21 @@
 'use client';
 
-import { LogoIcon } from '@/components/layout/logo';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { authClient } from '@/lib/auth-client';
-import { Loader2, Mail } from 'lucide-react';
-import Link from 'next/link';
+import { Loader2 } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [isSent, setIsSent] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
+  /**
+   * Preserved password reset handler.
+   */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-
     try {
       const { error } = await authClient.requestPasswordReset({
         email,
@@ -30,7 +27,6 @@ export default function ForgotPassword() {
         return;
       }
 
-      setIsSent(true);
       toast.success('Reset link sent to your email!');
     } catch (error) {
       toast.error('An unexpected error occurred');
@@ -39,87 +35,69 @@ export default function ForgotPassword() {
     }
   };
 
-  if (isSent) {
-    return (
-      <section className="flex min-h-screen bg-zinc-50 px-4 py-16 md:py-32 dark:bg-transparent">
-        <div className="bg-card m-auto h-fit w-full max-w-sm rounded-[calc(var(--radius)+.125rem)] border p-8 shadow-md">
-          <div className="text-center">
-            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
-              <Mail className="h-6 w-6 text-green-600 dark:text-green-400" />
-            </div>
-            <h1 className="mb-2 text-xl font-semibold">Check your email</h1>
-            <p className="mb-6 text-sm text-muted-foreground">
-              We&apos;ve sent a password reset link to <strong>{email}</strong>.
-            </p>
-            <div className="space-y-3">
-              <Button asChild className="w-full">
-                <a href="https://mail.google.com" target="_blank" rel="noreferrer">
-                  Go to Gmail
-                </a>
-              </Button>
-              <Button asChild variant="outline" className="w-full">
-                <Link href="/sign-in">Back to Login</Link>
-              </Button>
-            </div>
-          </div>
-        </div>
-      </section>
-    );
-  }
+  /**
+   * Google sign in fallback.
+   */
+  const handleGoogleSignIn = async () => {
+    setIsGoogleLoading(true);
+    try {
+      await authClient.signIn.social({
+        provider: 'google',
+        callbackURL: '/notebooks',
+      });
+    } catch (error) {
+      toast.error('Failed to sign in with Google');
+      setIsGoogleLoading(false);
+    }
+  };
 
   return (
-    <section className="flex min-h-screen bg-zinc-50 px-4 py-16 md:py-32 dark:bg-transparent">
-      <form
-        onSubmit={handleSubmit}
-        className="bg-card m-auto h-fit w-full max-w-sm rounded-[calc(var(--radius)+.125rem)] border p-0.5 shadow-md"
-      >
-        <div className="p-8 pb-6">
-          <div>
-            <Link href="/" aria-label="go home">
-              <LogoIcon />
-            </Link>
-            <h1 className="mb-1 mt-4 text-xl font-semibold">Forgot Password</h1>
-            <p className="text-sm text-muted-foreground">
-              Enter your email and we&apos;ll send you a link to reset your password.
-            </p>
-          </div>
+    <div className="w-full max-w-[460px] lg:max-w-[480px]">
+      <h1 className="font-serif text-[34px] sm:text-[46px] md:text-[56px] lg:text-[64px] xl:text-[70px] font-bold tracking-tight text-foreground leading-[1.04] mb-3.5 sm:mb-4 lg:mb-5">
+        Account access
+      </h1>
 
-          <div className="mt-6 space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email" className="block text-sm">
-                Email
-              </Label>
-              <Input
-                type="email"
-                required
-                name="email"
-                id="email"
-                placeholder="m@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                disabled={isLoading}
+      <p className="text-[15px] sm:text-[16px] xl:text-[17px] text-muted-foreground leading-relaxed mb-6 sm:mb-8 lg:mb-9">
+        Infera accounts are authenticated through Google. Passwords are secure and managed directly
+        via your Google credentials.
+      </p>
+
+      <div>
+        <button
+          type="button"
+          onClick={handleGoogleSignIn}
+          disabled={isGoogleLoading || isLoading}
+          className="flex w-full items-center justify-center gap-3 h-[48px] rounded-[8px] bg-white hover:bg-[#faf8f5] active:bg-[#f2efe9] text-[#1b1f3b] font-medium text-[15px] tracking-[-0.01em] shadow-[0_2px_8px_-2px_rgba(27,31,59,0.12),0_1px_3px_rgba(27,31,59,0.06)] hover:shadow-[0_4px_12px_-2px_rgba(27,31,59,0.18)] transition-all duration-150 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed dark:bg-card dark:text-foreground dark:hover:bg-accent/80 dark:shadow-[0_2px_8px_-2px_rgba(0,0,0,0.5)]"
+        >
+          {isGoogleLoading ? (
+            <Loader2 className="size-4.5 animate-spin text-muted-foreground" />
+          ) : (
+            <svg
+              className="size-[19px] shrink-0"
+              viewBox="0 0 256 262"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                fill="#4285f4"
+                d="M255.878 133.451c0-10.734-.871-18.567-2.756-26.69H130.55v48.448h71.947c-1.45 12.04-9.283 30.172-26.69 42.356l-.244 1.622l38.755 30.023l2.685.268c24.659-22.774 38.875-56.282 38.875-96.027"
               />
-            </div>
-
-            <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Sending Link...
-                </>
-              ) : (
-                'Send Reset Link'
-              )}
-            </Button>
-          </div>
-        </div>
-
-        <div className="bg-muted rounded-(--radius) border p-3 text-center">
-          <Button asChild variant="link" className="text-sm">
-            <Link href="/sign-in">Back to Sign In</Link>
-          </Button>
-        </div>
-      </form>
-    </section>
+              <path
+                fill="#34a853"
+                d="M130.55 261.1c35.248 0 64.839-11.605 86.453-31.622l-41.196-31.913c-11.024 7.688-25.82 13.055-45.257 13.055c-34.523 0-63.824-22.773-74.269-54.25l-1.531.13l-40.298 31.187l-.527 1.465C35.393 231.798 79.49 261.1 130.55 261.1"
+              />
+              <path
+                fill="#fbbc05"
+                d="M56.281 156.37c-2.756-8.123-4.351-16.827-4.351-25.82c0-8.994 1.595-17.697 4.206-25.82l-.073-1.73L15.26 71.312l-1.335.635C5.077 89.644 0 109.517 0 130.55s5.077 40.905 13.925 58.602z"
+              />
+              <path
+                fill="#eb4335"
+                d="M130.55 50.479c24.514 0 41.05 10.589 50.479 19.438l36.844-35.974C195.245 12.91 165.798 0 130.55 0C79.49 0 35.393 29.301 13.925 71.947l42.211 32.783c10.59-31.477 39.891-54.251 74.414-54.251"
+              />
+            </svg>
+          )}
+          <span>{isGoogleLoading ? 'Connecting to Google...' : 'Continue with Google'}</span>
+        </button>
+      </div>
+    </div>
   );
 }

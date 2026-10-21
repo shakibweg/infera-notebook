@@ -61,9 +61,12 @@ Before you begin, ensure you have:
 5. **Set up environment variables**
 
    ```bash
-   cp .env.example .env.local
-   # Edit .env.local with your configuration
+   cp .env.example .env
+   # Edit .env with your database, AI API keys, Pinecone, and S3 credentials
    ```
+
+   > [!NOTE]
+   > Operational scripts (`scripts/setup-bucket.ts`, `scripts/reset-pinecone.ts`) and Prisma load configuration directly from `.env`.
 
 6. **Set up the database**
 
@@ -71,15 +74,22 @@ Before you begin, ensure you have:
    pnpm run db:migrate
    ```
 
-7. **Start the development server**
+7. **(Optional) Configure Storage Bucket & CORS**
+
+   ```bash
+   pnpm run bucket:setup
+   ```
+
+8. **Start the development server**
 
    ```bash
    pnpm run dev
    ```
 
-8. **Start Inngest dev server** (in a separate terminal)
+9. **Start Inngest dev server** (in a separate terminal)
    ```bash
    pnpm run inngest:dev
+   # or run directly: inngest dev (dashboard on http://localhost:8288)
    ```
 
 ## Development Process
@@ -256,21 +266,38 @@ test(api): add tests for note creation endpoint
    git rebase upstream/main
    ```
 
-2. **Run linting**
+2. **Run local CI validation suite**
+   Ensure your code passes all checks that run in GitHub Actions:
 
    ```bash
+   # Type checking
+   pnpm run typecheck
+
+   # ESLint code quality
    pnpm run lint
+
+   # Prettier format check
+   pnpm run format:check
+   ```
+
+   To automatically format any mismatched files:
+
+   ```bash
+   pnpm run format
    ```
 
 3. **Test your changes**
-   - Test all affected functionality
-   - Check for TypeScript errors
-   - Verify the app runs correctly
+   - Test all affected UI components and API routes
+   - Verify that background jobs complete without errors in the Inngest dev console
+   - Verify the production build succeeds locally:
+     ```bash
+     pnpm run build
+     ```
 
 4. **Update documentation**
-   - Update README if needed
-   - Add code comments for complex logic
-   - Update type definitions
+   - Update README.md or ARCHITECTURE.md if changing workflows, models, or schemas
+   - Add JSDoc comments for complex utilities or handlers
+   - Update type definitions and Zod validation schemas
 
 ### Submitting a Pull Request
 
