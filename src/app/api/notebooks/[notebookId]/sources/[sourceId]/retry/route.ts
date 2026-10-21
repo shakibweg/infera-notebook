@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { getCurrentUser } from '@/actions/user';
+import { getCurrentUser } from '@/lib/user';
 import { inngest } from '@/inngest/client';
 import { Status } from '@/generated/prisma/enums';
 import { notebookIdParamSchema, sourceIdParamSchema } from '@/validators/sources';

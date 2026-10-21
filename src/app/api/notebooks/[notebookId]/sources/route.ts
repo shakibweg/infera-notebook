@@ -4,13 +4,11 @@
  */
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { getCurrentUser } from '@/actions/user';
+import { getCurrentUser } from '@/lib/user';
 import { notebookIdParamSchema, createSourceBodySchema } from '@/validators/sources';
 import { inngest } from '@/inngest/client';
 import { Status } from '@/generated/prisma/enums';
-import { deleteFile, uploadAsset, getSignedDownloadUrl, getPresignedUploadUrl } from '@/lib/s3';
-import { initializeVectorStore } from '@/lib/pinecone';
-import { deductCredit } from '@/actions/credits';
+import { deductCredit } from '@/lib/credits';
 
 /**
  * GET Handler
@@ -204,37 +202,41 @@ export async function DELETE(
       return NextResponse.json({ error: 'Notebook not found' }, { status: 404 });
     }
 
-    // 1. Get all sources to clean up external storage
+    // 1. Get all sources to clean up
     const sources = await prisma.source.findMany({
       where: { notebookId },
       include: { file: true },
     });
 
-    // 2. Cleanup Storage (S3/R2)
-    for (const source of sources) {
-      if (source.file?.path) {
-        try {
-          await deleteFile(source.file.path);
-        } catch (e) {
-          console.error(`[DELETE_ALL_SOURCES] S3 cleanup failed for ${source.id}:`, e);
-        }
-      }
-    }
+    const fileIds = sources.map((s) => s.fileId).filter(Boolean);
 
-    // 3. Cleanup Pinecone
-    try {
-      const vectorStore = await initializeVectorStore();
-      await vectorStore.delete({
-        filter: { notebookId: { $eq: notebookId } },
-      });
-    } catch (e) {
-      console.error('[DELETE_ALL_SOURCES] Pinecone failed:', e);
-    }
-
-    // 4. Delete from Database
+    // 2. Delete Sources from Database immediately so UI updates instantly
     await prisma.source.deleteMany({
       where: { notebookId },
     });
+
+    // 3. Delete orphaned File records from Database
+    if (fileIds.length > 0) {
+      await prisma.file
+        .deleteMany({
+          where: { id: { in: fileIds } },
+        })
+        .catch((e) => console.warn('[DELETE_ALL_SOURCES] File cleanup warning:', e));
+    }
+
+    // 4. Dispatch Inngest cleanup events for each source (Pinecone vectors, S3 storage, job cancellation)
+    await Promise.allSettled(
+      sources.map((source) =>
+        inngest.send({
+          name: 'source/deleted',
+          data: {
+            sourceId: source.id,
+            filePath: source.file?.path,
+            fileId: source.fileId,
+          },
+        })
+      )
+    ).catch((err) => console.error('[DELETE_ALL_SOURCES] Inngest dispatch failed:', err));
 
     return NextResponse.json({ success: true });
   } catch (error) {

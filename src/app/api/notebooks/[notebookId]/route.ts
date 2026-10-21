@@ -4,10 +4,7 @@
  */
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { getCurrentUser } from '@/actions/user';
-import { deleteFile, uploadAsset, getSignedDownloadUrl, getPresignedUploadUrl } from '@/lib/s3';
-import { initializeVectorStore } from '@/lib/pinecone';
-import { AllowedNoteType } from '@/generated/prisma/enums';
+import { getCurrentUser } from '@/lib/user';
 import { inngest } from '@/inngest/client';
 
 /**
@@ -119,11 +116,13 @@ export async function DELETE(
       return NextResponse.json({ error: 'Notebook not found' }, { status: 404 });
     }
 
-    // 1. Fetch all sources to clean up external storage
+    // 1. Fetch all sources to clean up external storage and orphaned files
     const sources = await prisma.source.findMany({
       where: { notebookId, notebook: { userId: user.id } },
       include: { file: true },
     });
+
+    const fileIds = sources.map((s) => s.fileId).filter(Boolean);
 
     // 2. Fetch all notes to clean up external storage and pending generations
     const notes = await prisma.note.findMany({
@@ -131,68 +130,39 @@ export async function DELETE(
         notebookId,
         notebook: { userId: user.id },
       },
+      select: {
+        id: true,
+        type: true,
+        content: true,
+      },
     });
 
-    // 3. Cleanup Pincone Vectors
-    try {
-      const vectorStore = await initializeVectorStore();
-      await vectorStore.delete({
-        filter: { notebookId: { $eq: notebookId } },
-      });
-    } catch (e) {
-      console.error('[DELETE_NOTEBOOK] Pinecone cleanup failed:', e);
-    }
-
-    // 4. Cleanup S3 Storage for Sources
-    for (const source of sources) {
-      if (source.file?.path) {
-        try {
-          await deleteFile(source.file.path);
-        } catch (e) {
-          console.error(`[DELETE_NOTEBOOK] S3 source cleanup failed for ${source.id}:`, e);
-        }
-      }
-    }
-
-    // 5. Cleanup S3 Storage and Pending Generations for Notes
-    for (const note of notes) {
-      // Clean up assets directly
-      if (note.content) {
-        try {
-          const parsed = JSON.parse(note.content);
-          const paths: string[] = [];
-          if (note.type === AllowedNoteType.INFOGRAPHIC && parsed.path) paths.push(parsed.path);
-          if (note.type === AllowedNoteType.SLIDE_DECK && Array.isArray(parsed)) {
-            parsed.forEach((s: any) => s.path && paths.push(s.path));
-          }
-          if (note.type === AllowedNoteType.AUDIO_OVERVIEW && parsed.path) paths.push(parsed.path);
-          if (note.type === AllowedNoteType.VIDEO_OVERVIEW) {
-            if (parsed.path) paths.push(parsed.path);
-            if (Array.isArray(parsed.images)) {
-              parsed.images.forEach((img: any) => img.path && paths.push(img.path));
-            }
-          }
-          await Promise.allSettled(paths.map((p) => deleteFile(p)));
-        } catch (e) {
-          // Ignore parse errors
-        }
-      }
-
-      // Fire Inngest event to cancel any active generations
-      await inngest
-        .send({
-          name: 'note/deleted',
-          data: { noteId: note.id },
-        })
-        .catch((e) =>
-          console.error(`[DELETE_NOTEBOOK] Inngest event failed for note ${note.id}:`, e)
-        );
-    }
-
-    // 6. Delete the notebook (cascade deletes will handle related DB records)
+    // 3. Delete the notebook (database cascade deletes will handle notes, sources, chats, messages)
     await prisma.notebook.delete({
       where: { id: notebookId },
     });
+
+    // 4. Delete orphaned File records from database
+    if (fileIds.length > 0) {
+      await prisma.file
+        .deleteMany({
+          where: { id: { in: fileIds } },
+        })
+        .catch((e) => console.warn('[DELETE_NOTEBOOK] File cleanup warning:', e));
+    }
+
+    // 5. Offload all background cleanup to Inngest (Pinecone vectors, S3 storage, job cancellation)
+    await inngest
+      .send({
+        name: 'notebook/deleted',
+        data: {
+          notebookId,
+          sources: sources.map((s) => ({ id: s.id, filePath: s.file?.path })),
+          notes: notes.map((n) => ({ id: n.id, type: n.type, content: n.content })),
+          fileIds,
+        },
+      })
+      .catch((e) => console.error('[DELETE_NOTEBOOK] Failed to dispatch Inngest cleanup event:', e));
 
     return NextResponse.json({ success: true });
   } catch (error) {

@@ -1,5 +1,5 @@
-import { DEFAULT_CREDITS, DEFAULT_CREDIT_DEDUCTION } from '@/lib/constants';
-import prisma from '@/lib/prisma';
+import { DEFAULT_CREDITS, DEFAULT_CREDIT_DEDUCTION } from './constants';
+import prisma from './prisma';
 
 /**
  * Checks if a user's daily credits should be reset and performs the reset if needed.

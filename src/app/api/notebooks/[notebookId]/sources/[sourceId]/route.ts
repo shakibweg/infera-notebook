@@ -4,15 +4,13 @@
  */
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { getCurrentUser } from '@/actions/user';
+import { getCurrentUser } from '@/lib/user';
 
 import {
   notebookIdParamSchema,
   sourceIdParamSchema,
   updateSourceTitleBodySchema,
 } from '@/validators/sources';
-import { deleteFile, uploadAsset, getSignedDownloadUrl, getPresignedUploadUrl } from '@/lib/s3';
-import { initializeVectorStore } from '@/lib/pinecone';
 import { inngest } from '@/inngest/client';
 
 /**
@@ -168,40 +166,33 @@ export async function DELETE(
       return NextResponse.json({ error: 'Source not found' }, { status: 404 });
     }
 
-    // 1. Send event to Inngest to cancel any active processing functions
-    try {
-      await inngest.send({
-        name: 'source/deleted',
-        data: { sourceId },
-      });
-    } catch (inngestError) {
-      console.error('[DELETE_SOURCE] Failed to send cancel event to Inngest:', inngestError);
-    }
+    const fileId = source.fileId;
+    const filePath = source.file?.path;
 
-    // 2. Delete from Storage (S3/R2) if applicable
-    if (source.file?.path) {
-      try {
-        await deleteFile(source.file.path);
-      } catch (s3Error) {
-        console.error('[DELETE_SOURCE] S3 cleanup failed:', s3Error);
-        // Continue anyway
-      }
-    }
-
-    // 3. Delete from Vector Store (Pinecone)
-    try {
-      const vectorStore = await initializeVectorStore();
-      await vectorStore.delete({
-        filter: { sourceId: { $eq: sourceId } },
-      });
-    } catch (vectorError) {
-      console.error('[DELETE_SOURCE] Vector store cleanup failed:', vectorError);
-      // Continue anyway
-    }
-
-    // 4. Delete from Database
+    // 1. Delete Source from Database immediately so UI updates instantly
     await prisma.source.delete({
       where: { id: sourceId },
+    });
+
+    // 2. Delete associated File record from Database
+    if (fileId) {
+      await prisma.file.delete({
+        where: { id: fileId },
+      }).catch((fileErr) => {
+        console.warn('[DELETE_SOURCE] File record cleanup warning:', fileErr);
+      });
+    }
+
+    // 3. Offload external cleanup (Pinecone vectors, S3 storage, cancellation) to Inngest
+    await inngest.send({
+      name: 'source/deleted',
+      data: {
+        sourceId,
+        filePath,
+        fileId,
+      },
+    }).catch((inngestErr) => {
+      console.error('[DELETE_SOURCE] Failed to dispatch Inngest cleanup event:', inngestErr);
     });
 
     return NextResponse.json({ success: true });

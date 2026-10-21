@@ -1,10 +1,13 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
 import { GEMINI_API_KEY } from '@/lib/env';
-import { getUser } from '@/actions/user';
+import { getUser } from '@/lib/user';
+
+import { LIVE_ROUTER_MODELS } from '@/lib/llm/model-router';
 
 /**
- * GET Handler - Provides a short-lived token for the Gemini Live API.
+ * GET Handler - Provides a short-lived token for the Gemini Live API
+ * along with the prioritized list of Live API fallback models.
  */
 export async function GET() {
   try {
@@ -27,7 +30,6 @@ export async function GET() {
 
     const token = await client.authTokens.create({
       config: {
-        uses: 1, // Optional: limit uses
         expireTime: expireTime.toISOString(),
         newSessionExpireTime: newSessionExpireTime.toISOString(),
         httpOptions: { apiVersion: 'v1alpha' },
@@ -37,6 +39,7 @@ export async function GET() {
     return NextResponse.json({
       token: token.name,
       expiresAt: expireTime.toISOString(),
+      models: LIVE_ROUTER_MODELS,
     });
   } catch (error) {
     console.error('[API_LIVE_TOKEN_ERROR]', error);

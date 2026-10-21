@@ -3,8 +3,8 @@
  * Retrieves the current message credit balance for the authenticated user.
  */
 import { NextResponse } from 'next/server';
-import { getCurrentUser } from '@/actions/user';
-import { getUserCredits } from '@/actions/credits';
+import { getCurrentUser } from '@/lib/user';
+import { getUserCredits } from '@/lib/credits';
 
 /**
  * GET Handler

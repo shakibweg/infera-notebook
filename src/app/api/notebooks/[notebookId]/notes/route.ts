@@ -4,14 +4,15 @@
  */
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { getCurrentUser } from '@/actions/user';
+import { getCurrentUser } from '@/lib/user';
 import { notebookIdParamSchema } from '@/validators/sources';
 import { AllowedNoteType, Status } from '@/generated/prisma/enums';
 import { inngest } from '@/inngest/client';
-import { deductCredit } from '@/actions/credits';
-import { generateNoteTitleFromMessage } from '@/actions/generate-title';
+import { deductCredit } from '@/lib/credits';
+import { generateNoteTitleFromMessage } from '@/lib/llm';
 import { createNoteBodySchema, deleteNoteBodySchema } from '@/validators/notes';
 import { deleteFile, uploadAsset, getSignedDownloadUrl, getPresignedUploadUrl } from '@/lib/s3';
+import { deleteNoteAssets } from '@/lib/note-utils';
 
 /**
  * GET Handler
@@ -271,36 +272,19 @@ export async function DELETE(
         },
       });
 
-      // Synchronously clean up assets for each note (fire-and-forget or awaited)
-      for (const note of notesToDelete) {
-        if (!note.content) continue;
-        try {
-          const parsed = JSON.parse(note.content);
-          const paths: string[] = [];
-          if (note.type === AllowedNoteType.INFOGRAPHIC && parsed.path) paths.push(parsed.path);
-          if (note.type === AllowedNoteType.SLIDE_DECK && Array.isArray(parsed)) {
-            parsed.forEach((s: any) => s.path && paths.push(s.path));
-          }
-          if (note.type === AllowedNoteType.AUDIO_OVERVIEW && parsed.path) paths.push(parsed.path);
-          if (note.type === AllowedNoteType.VIDEO_OVERVIEW) {
-            if (parsed.path) paths.push(parsed.path);
-            if (Array.isArray(parsed.images)) {
-              parsed.images.forEach((img: any) => img.path && paths.push(img.path));
-            }
-          }
+      // Clean up assets for each note and cancel any in-flight generations
+      await Promise.allSettled(
+        notesToDelete.map((note) => deleteNoteAssets(note.type, note.content))
+      );
 
-          // Delete all identified paths
-          await Promise.allSettled(paths.map((p) => deleteFile(p)));
-        } catch (e) {
-          console.error(`[DELETE_ALL_NOTES] Failed to clean up assets for note ${note.id}:`, e);
-        }
-
-        // Still fire event for each to cancel any pending generations
-        await inngest.send({
-          name: 'note/deleted',
-          data: { noteId: note.id },
-        });
-      }
+      await Promise.allSettled(
+        notesToDelete.map((note) =>
+          inngest.send({
+            name: 'note/deleted',
+            data: { noteId: note.id },
+          })
+        )
+      ).catch((e) => console.error('[DELETE_ALL_NOTES] Inngest cancel events failed:', e));
 
       return NextResponse.json({ success: true });
     }
@@ -328,26 +312,7 @@ export async function DELETE(
     });
 
     // Clean up assets directly in the route
-    if (note.content) {
-      try {
-        const parsed = JSON.parse(note.content);
-        const paths: string[] = [];
-        if (note.type === AllowedNoteType.INFOGRAPHIC && parsed.path) paths.push(parsed.path);
-        if (note.type === AllowedNoteType.SLIDE_DECK && Array.isArray(parsed)) {
-          parsed.forEach((s: any) => s.path && paths.push(s.path));
-        }
-        if (note.type === AllowedNoteType.AUDIO_OVERVIEW && parsed.path) paths.push(parsed.path);
-        if (note.type === AllowedNoteType.VIDEO_OVERVIEW) {
-          if (parsed.path) paths.push(parsed.path);
-          if (Array.isArray(parsed.images)) {
-            parsed.images.forEach((img: any) => img.path && paths.push(img.path));
-          }
-        }
-        await Promise.allSettled(paths.map((p) => deleteFile(p)));
-      } catch (e) {
-        console.error(`[DELETE_NOTE] Failed to clean up assets for note ${noteId}:`, e);
-      }
-    }
+    await deleteNoteAssets(note.type, note.content);
 
     // Fire Inngest cancel event with only noteId
     await inngest.send({
@@ -355,7 +320,7 @@ export async function DELETE(
       data: {
         noteId,
       },
-    });
+    }).catch((e) => console.error('[DELETE_NOTE] Inngest cancel event failed:', e));
 
     return NextResponse.json({ success: true });
   } catch (error) {

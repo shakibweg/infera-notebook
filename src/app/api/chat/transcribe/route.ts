@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
 import { GEMINI_API_KEY } from '@/lib/llm/config';
-import { CHAT_MODEL_ID } from '@/lib/constants';
+import { CHAT_ROUTER_MODELS } from '@/lib/llm/model-router';
 
 export async function POST(req: Request) {
   const google = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
@@ -23,27 +23,46 @@ export async function POST(req: Request) {
     const arrayBuffer = await audioFile.arrayBuffer();
     const base64Audio = Buffer.from(arrayBuffer).toString('base64');
 
-    const response = await google.models.generateContent({
-      model: CHAT_MODEL_ID,
-      contents: [
-        {
-          role: 'user',
-          parts: [
+    let transcript = '';
+    const errors: Record<string, string> = {};
+
+    for (const model of CHAT_ROUTER_MODELS) {
+      try {
+        const response = await google.models.generateContent({
+          model,
+          contents: [
             {
-              inlineData: {
-                data: base64Audio,
-                mimeType: audioFile.type || 'audio/webm', // MediaRecorder default is usually webm
-              },
-            },
-            {
-              text: 'Transcribe this audio exactly as spoken. Return only the transcript text without any preamble or conversational fillers.',
+              role: 'user',
+              parts: [
+                {
+                  inlineData: {
+                    data: base64Audio,
+                    mimeType: audioFile.type || 'audio/webm',
+                  },
+                },
+                {
+                  text: 'Transcribe this audio exactly as spoken. Return only the transcript text without any preamble or conversational fillers.',
+                },
+              ],
             },
           ],
-        },
-      ],
-    });
+        });
 
-    const transcript = response.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        transcript = response.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        if (transcript) {
+          break;
+        }
+      } catch (err: any) {
+        errors[model] = err?.message || String(err);
+        console.warn(
+          `[Transcribe Router] Model "${model}" failed: ${errors[model]}. Trying next model...`
+        );
+      }
+    }
+
+    if (!transcript && Object.keys(errors).length > 0) {
+      throw new Error(`All models failed: ${JSON.stringify(errors)}`);
+    }
 
     return NextResponse.json({ transcript });
   } catch (error) {

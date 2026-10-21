@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { generateAudio, aiConfig } from '@/lib/llm';
-import { getCurrentUser } from '@/actions/user';
+import { getCurrentUser } from '@/lib/user';
 
 export async function POST(req: Request) {
   try {

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { getCurrentUser } from '@/actions/user';
-import { deductCredit } from '@/actions/credits';
+import { getCurrentUser } from '@/lib/user';
+import { deductCredit } from '@/lib/credits';
 
 export async function POST() {
   try {

@@ -4,12 +4,12 @@
  * Handles user message persistence, credit management, and AI streaming.
  */
 import { initializeVectorStore } from '@/inngest/helpers';
-import { streamText, googleConfig } from '@/lib/llm';
-import { getCurrentUser } from '@/actions/user';
+import { streamText, googleConfig, generateChatTitle } from '@/lib/llm';
+import { getCurrentUser } from '@/lib/user';
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { MessageRole } from '@/generated/prisma/enums';
-import { deductCredit } from '@/actions/credits';
+import { deductCredit } from '@/lib/credits';
 import { INTERACTIVE_AGENT_SYSTEM_PROMPT } from '@/lib/prompts';
 
 /**
@@ -27,7 +27,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { sourceIds, messages, notebookId } = await req.json();
+    const { sourceIds, messages, notebookId, chatId } = await req.json();
 
     if (!notebookId) {
       return NextResponse.json({ error: 'notebookId is required' }, { status: 400 });
@@ -46,6 +46,24 @@ export async function POST(req: Request) {
         { error: 'Forbidden: You do not have access to this notebook' },
         { status: 403 }
       );
+    }
+
+    // Resolve or create active chat
+    let activeChatId = chatId;
+    if (!activeChatId) {
+      let chat = await prisma.chat.findFirst({
+        where: { notebookId },
+        orderBy: { createdAt: 'desc' },
+      });
+      if (!chat) {
+        chat = await prisma.chat.create({
+          data: {
+            notebookId,
+            title: 'Untitled chat',
+          },
+        });
+      }
+      activeChatId = chat.id;
     }
 
     // Get the last message (user's current message)
@@ -71,10 +89,59 @@ export async function POST(req: Request) {
     await prisma.message.create({
       data: {
         notebookId: notebookId,
+        chatId: activeChatId,
         role: MessageRole.user,
         parts: userParts,
       },
     });
+
+    // Auto-update chat title if still default or first exchange
+    let titlePromise: Promise<string | null> | null = null;
+    try {
+      const currentChat = await prisma.chat.findUnique({
+        where: { id: activeChatId },
+        select: { title: true, _count: { select: { messages: true } } },
+      });
+
+      const textContent =
+        (typeof lastMessage.content === 'string' && lastMessage.content) ||
+        (Array.isArray(userParts) && userParts.find((p: any) => p.type === 'text')?.text) ||
+        '';
+
+      const trimmedText = textContent.trim();
+      const quickTitle = trimmedText.slice(0, 32);
+
+      const isDefaultOrFirst =
+        currentChat &&
+        (currentChat.title === 'New Chat' ||
+          currentChat.title === 'New chat' ||
+          currentChat.title === 'Untitled chat' ||
+          /^Chat \d+$/.test(currentChat.title) ||
+          currentChat.title === quickTitle ||
+          currentChat._count.messages <= 2);
+
+      if (isDefaultOrFirst && trimmedText) {
+        if (
+          currentChat.title === 'New Chat' ||
+          currentChat.title === 'New chat' ||
+          currentChat.title === 'Untitled chat' ||
+          /^Chat \d+$/.test(currentChat.title)
+        ) {
+          await prisma.chat.update({
+            where: { id: activeChatId },
+            data: { title: quickTitle },
+          });
+        }
+
+        // Generate AI title concurrently in the background during streaming
+        titlePromise = generateChatTitle(trimmedText).catch((err) => {
+          console.warn('[CHAT] Background AI title generation failed:', err);
+          return null;
+        });
+      }
+    } catch (e) {
+      console.warn('[CHAT] Auto-titling skipped:', e);
+    }
 
     // Create tool context with user and notebook information
     const toolContext = {
@@ -82,6 +149,25 @@ export async function POST(req: Request) {
       sourceIds: sourceIds || [],
       userId: user.id,
     };
+
+    // Query active sources to provide the AI agent with document-level awareness
+    const targetSourceIds =
+      Array.isArray(sourceIds) && sourceIds.length > 0 ? sourceIds : undefined;
+    const activeSources = await prisma.source.findMany({
+      where: {
+        notebookId,
+        ...(targetSourceIds ? { id: { in: targetSourceIds } } : {}),
+      },
+      select: { id: true, sourceTitle: true, type: true },
+    });
+
+    let activeSourcesContext = '';
+    if (activeSources.length > 0) {
+      const sourceList = activeSources
+        .map((s, idx) => `${idx + 1}. "${s.sourceTitle}" (Type: ${s.type}) [Source ID: ${s.id}]`)
+        .join('\n');
+      activeSourcesContext = `\n\n<active_sources>\nActive Sources in Context (${activeSources.length} available):\n${sourceList}\n\nWhen the user asks to "explain the doc", "summarize", or refers to their materials, use the source title(s) above to formulate targeted, precise queries for searchInVectorStore.\n</active_sources>`;
+    }
 
     // Save assistant message after streaming completes
     const onFinish = async (result: {
@@ -116,18 +202,37 @@ export async function POST(req: Request) {
         await prisma.message.create({
           data: {
             notebookId: notebookId,
+            chatId: activeChatId,
             role: MessageRole.assistant,
             parts: assistantParts,
           },
         });
+
+        // Await AI title generation and persist if ready
+        if (titlePromise) {
+          try {
+            const aiTitle = await titlePromise;
+            if (aiTitle && aiTitle.trim() && aiTitle !== 'Untitled chat') {
+              await prisma.chat.update({
+                where: { id: activeChatId },
+                data: { title: aiTitle.trim() },
+              });
+              console.log(`[CHAT] Auto-updated chat title to: "${aiTitle.trim()}"`);
+            }
+          } catch (err) {
+            console.warn('[CHAT] Failed to persist AI title in onFinish:', err);
+          }
+        }
       } catch (error) {
         console.error('[CHAT] Failed to save assistant message:', error);
       }
     };
 
+    const systemPromptWithSources = `${INTERACTIVE_AGENT_SYSTEM_PROMPT}${activeSourcesContext}`;
+
     const stream = await streamText(
       {
-        messages: [{ role: 'system', content: INTERACTIVE_AGENT_SYSTEM_PROMPT }, ...messages],
+        messages: [{ role: 'system', content: systemPromptWithSources }, ...messages],
         context: toolContext,
         onFinish,
         abortSignal: req.signal,
@@ -137,9 +242,11 @@ export async function POST(req: Request) {
 
     return new Response(stream, {
       headers: {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
+        'Content-Type': 'text/event-stream; charset=utf-8',
+        'Cache-Control': 'no-cache, no-transform',
         Connection: 'keep-alive',
+        'X-Accel-Buffering': 'no',
+        'X-Content-Type-Options': 'nosniff',
       },
     });
   } catch (error) {

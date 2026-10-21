@@ -1,14 +1,14 @@
 /**
  * Notebook Messages API
- * Handles the storage and retrieval of chat history for a specific notebook.
+ * Handles the storage and retrieval of chat history for a specific notebook/chat.
  */
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { getCurrentUser } from '@/actions/user';
+import { getCurrentUser } from '@/lib/user';
 
 /**
  * GET Handler
- * Fetches all chat messages for a notebook in chronological order.
+ * Fetches chat messages for a notebook (optionally filtered by chatId) in chronological order.
  */
 export async function GET(req: Request, { params }: { params: Promise<{ notebookId: string }> }) {
   try {
@@ -18,7 +18,6 @@ export async function GET(req: Request, { params }: { params: Promise<{ notebook
     }
 
     const { notebookId } = await params;
-
     if (!notebookId) {
       return NextResponse.json({ error: 'notebookId is required' }, { status: 400 });
     }
@@ -35,10 +34,14 @@ export async function GET(req: Request, { params }: { params: Promise<{ notebook
       return NextResponse.json({ error: 'Notebook not found' }, { status: 404 });
     }
 
-    // Fetch messages for this notebook, ordered by creation date
+    const { searchParams } = new URL(req.url);
+    const chatId = searchParams.get('chatId');
+
+    // Fetch messages for this notebook & optional chat, ordered by creation date
     const dbMessages = await prisma.message.findMany({
       where: {
-        notebookId: notebookId,
+        notebookId,
+        ...(chatId ? { chatId } : {}),
       },
       orderBy: {
         createdAt: 'asc',
@@ -47,11 +50,15 @@ export async function GET(req: Request, { params }: { params: Promise<{ notebook
 
     return NextResponse.json({ messages: dbMessages });
   } catch (error) {
-    console.error('[MESSAGES]', error);
+    console.error('[MESSAGES GET]', error);
     return NextResponse.json({ error: 'Failed to fetch messages' }, { status: 500 });
   }
 }
 
+/**
+ * DELETE Handler
+ * Deletes chat messages (optionally by chatId or for the whole notebook).
+ */
 export async function DELETE(
   req: Request,
   { params }: { params: Promise<{ notebookId: string }> }
@@ -63,7 +70,6 @@ export async function DELETE(
     }
 
     const { notebookId } = await params;
-
     if (!notebookId) {
       return NextResponse.json({ error: 'notebookId is required' }, { status: 400 });
     }
@@ -80,10 +86,14 @@ export async function DELETE(
       return NextResponse.json({ error: 'Notebook not found' }, { status: 404 });
     }
 
-    // Delete all messages for this notebook
+    const { searchParams } = new URL(req.url);
+    const chatId = searchParams.get('chatId');
+
+    // Delete messages for this specific chat or for the entire notebook
     await prisma.message.deleteMany({
       where: {
-        notebookId: notebookId,
+        notebookId,
+        ...(chatId ? { chatId } : {}),
       },
     });
 

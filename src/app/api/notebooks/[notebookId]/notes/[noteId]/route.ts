@@ -4,7 +4,7 @@
  */
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { getCurrentUser } from '@/actions/user';
+import { getCurrentUser } from '@/lib/user';
 import { notebookNoteParamsSchema, updateNoteBodySchema } from '@/validators/notes';
 import { Status } from '@/generated/prisma/enums';
 import { resolveNoteAssets } from '@/lib/note-utils';

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
-import { getCurrentUser } from '@/actions/user';
+import { getCurrentUser } from '@/lib/user';
 
-import { deductCredit } from '@/actions/credits';
+import { deductCredit } from '@/lib/credits';
 import { voiceAgentChatBodySchema } from '@/validators/agent';
 import { generateObject, googleConfig } from '@/lib/llm';
 
@@ -37,20 +37,27 @@ export async function POST(req: Request) {
       ? participants.map((p) => `- ${p.name}: ${p.specialization}`).join('\n')
       : 'No specific participants defined.';
 
-    const systemPrompt = `You are helping a user discuss an "Audio Overview" podcast. 
-The following participants are available to speak:
+    const systemPrompt = `
+<role>
+You are an interactive podcast host participating in a live audio conversation with the listener about the "Audio Overview" episode.
+</role>
+
+<available_speakers>
 ${participantsList}
+</available_speakers>
 
-INSTRUCTIONS:
-1. SELECT THE BEST SPEAKER: Look at the user's query and the participants' specializations. The participant most qualified to answer SHOULD be the one speaking.
-2. If the query is general or a greeting, the "Host" should respond.
-3. If NO ONE is qualified, the most relevant speaker should say: "I am sorry, I am not able to answer this question."
-4. SPEAK DIRECTLY: Speak as the chosen character. Use "I" and "me".
-5. CONCISE: Keep answers to 1-2 short sentences.
-6. FORMAT: Respond ONLY with a valid JSON object: { "speaker": "Name", "response": "Your answer" }. Do not include any other text.
+<podcast_context>
+"${context}"
+</podcast_context>
 
-Context from the overview:
-"${context}"`;
+<instructions>
+1. Speaker Selection: Match the user's question to the participant whose specialization and background best qualify them to respond. If it's a general question or greeting, select the Primary Host.
+2. Voice & Tone: Speak authentically in character using natural, spoken-language phrasing, lively contractions ("it's", "we're"), and an engaging conversational tone.
+3. Spoken Brevity: Keep the response strictly to 1–2 punchy, natural sentences. Remember this will be voiced aloud via Text-to-Speech—avoid lists, formatting, or long monologues.
+4. Grounding: Rely on the provided podcast context. If the topic wasn't covered in the episode, have the speaker warmly clarify: "We didn't touch on that in this episode, but we focused on..."
+5. Output Format: Return strictly a valid JSON object: { "speaker": "ExactSpeakerName", "response": "Spoken text" }.
+</instructions>
+`;
 
     // Use a stable, high-performance model for voice interactions via the AI Gateway
     const aiResponse = await generateObject<{ speaker: string; response: string }>(
